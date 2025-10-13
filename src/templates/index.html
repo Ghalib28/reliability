@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="{{ url_for('static', filename='assets/icon.ico') }}"
+      type="image/x-icon"
+    />
+    <title>Reliability Lambda Predict - MIL-HDBK-217F</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-content">
+          <div class="logo-section">
+            <img
+              src="{{ url_for('static', filename='assets/icon.png') }}"
+              alt="Calculator"
+              class="header-logo"
+            />
+            <h1>Reliability Lambda Predict</h1>
+            <span class="version">v1.1.0</span>
+          </div>
+          <div class="header-actions">
+            <button id="newProject" class="btn btn-primary">
+              <img
+                src="{{ url_for('static', filename='assets/create.png') }}"
+                alt="New"
+                class="btn-icon"
+              />
+              New Project
+            </button>
+            <button id="openProject" class="btn btn-secondary">
+              <img
+                src="{{ url_for('static', filename='assets/import.png') }}"
+                alt="Open"
+                class="btn-icon"
+              />
+              Import Project
+            </button>
+            <button
+              id="exportProject"
+              class="btn btn-success"
+              style="display: none"
+            >
+              <img
+                src="{{ url_for('static', filename='assets/export.png') }}"
+                alt="Export"
+                class="btn-icon"
+              />
+              Export Project
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="welcome-screen">
+          <div class="welcome-container">
+            <div class="welcome-icon">
+              <img
+                src="{{ url_for('static', filename='assets/icon.png') }}"
+                alt="Calculator"
+                class="welcome-logo"
+              />
+            </div>
+            <h2>Welcome to Reliability Lambda Predict</h2>
+            <p>MIL-HDBK-217F Reliability Prediction Of Electronic Equipment</p>
+
+            <div class="welcome-actions">
+              <button
+                class="btn btn-primary btn-large"
+                onclick="app.createNewProject()"
+              >
+                <img
+                  src="{{ url_for('static', filename='assets/create.png') }}"
+                  alt="New"
+                  class="btn-icon"
+                />
+                Create New Project
+              </button>
+              <button
+                class="btn btn-secondary btn-large"
+                onclick="app.showOpenProjectDialog()"
+              >
+                <img
+                  src="{{ url_for('static', filename='assets/import.png') }}"
+                  alt="Open"
+                  class="btn-icon"
+                />
+                Import Existing Project
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project Setup Screen -->
+        <div
+          id="projectSetupScreen"
+          class="project-setup-screen"
+          style="display: none"
+        >
+          <div class="setup-container">
+            <div class="setup-header">
+              <h2><i class="fas fa-project-diagram"></i> Create New Project</h2>
+              <button
+                class="btn btn-secondary"
+                onclick="app.showWelcomeScreen()"
+              >
+                <i class="fas fa-arrow-left"></i> Back
+              </button>
+            </div>
+
+            <form id="projectSetupForm" class="setup-form">
+              <div class="form-grid-simple">
+                <div class="form-group">
+                  <label for="projectName">Project Name *</label>
+                  <input
+                    type="text"
+                    id="projectName"
+                    name="projectName"
+                    required
+                    placeholder="e.g., Power Supply Unit Analysis"
+                    autocomplete="off"
+                  />
+                  <small
+                    >Enter a descriptive name for your reliability analysis
+                    project</small
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label for="projectDescription">Project Description</label>
+                  <textarea
+                    id="projectDescription"
+                    name="projectDescription"
+                    rows="4"
+                    placeholder="Brief description of the reliability analysis project, components involved, or analysis objectives..."
+                  ></textarea>
+                  <small
+                    >Optional: Provide additional details about your
+                    project</small
+                  >
+                </div>
+              </div>
+
+              <div class="setup-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  onclick="app.showWelcomeScreen()"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-primary btn-large">
+                  <i class="fas fa-arrow-right"></i> Create Project & Continue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div
+          id="workspaceScreen"
+          class="workspace-screen"
+          style="display: none"
+        >
+          <div class="workspace-container">
+            <!-- Left Sidebar -->
+            <aside class="workspace-sidebar">
+              <div class="sidebar-section project-info">
+                <h3>
+                  <img
+                    src="{{ url_for('static', filename='assets/info.png') }}"
+                    alt="Info"
+                    class="section-icon"
+                  />
+                  Project Info
+                </h3>
+                <div id="projectInfoDisplay"></div>
+                <button
+                  class="btn btn-secondary btn-sm"
+                  onclick="app.editProjectInfo()"
+                >
+                  <i class="fas fa-edit"></i> Edit Info
+                </button>
+              </div>
+
+              <div class="sidebar-section">
+                <h3>
+                  <img
+                    src="{{ url_for('static', filename='assets/info.png') }}"
+                    alt="Info"
+                    class="section-icon"
+                  />
+                  MIL-HDBK-217F
+                </h3>
+                <p>
+                  Military Handbook for Reliability Prediction of Electronic
+                  Equipment
+                </p>
+                <ul class="info-list">
+                  <li><strong>Standard:</strong> MIL-HDBK-217F Notice 2</li>
+                  <li><strong>Units:</strong> Failures/10⁶ Hours</li>
+                </ul>
+              </div>
+
+              <div class="sidebar-section">
+                <h3>
+                  <img
+                    src="{{ url_for('static', filename='assets/formula.png') }}"
+                    alt="Formula"
+                    class="section-icon"
+                  />
+                  Formula Capacitor
+                </h3>
+                <div class="formula">
+                  λ<sub>P</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>C</sub>
+                  × π<sub>V</sub> × π<sub>Q</sub> × π<sub>E</sub> × π<sub
+                    >SR</sub
+                  >
+                </div>
+                <ul class="formula-legend">
+                  <li>
+                    <strong>λ<sub>P</sub>:</strong> Predicted failure rate
+                  </li>
+                  <li><strong>λ<sub>b</sub>:</strong> Base failure rate</li>
+                  <li><strong>π<sub>T</sub>:</strong> Temperature factor</li>
+                  <li><strong>π<sub>C</sub>:</strong> Capacitance factor</li>
+                  <li><strong>π<sub>V</sub>:</strong> Voltage stress factor</li>
+                  <li><strong>π<sub>Q</sub>:</strong> Quality factor</li>
+                  <li><strong>π<sub>E</sub>:</strong> Environment factor</li>
+                  <li>
+                    <strong>π<sub>SR</sub>:</strong> Series resistance factor
+                  </li>
+                </ul>
+              </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <div class="workspace-main">
+              <!-- Component Type Selection Panel -->
+              <div class="component-selection-section">
+                <div class="section-header">
+                  <h3>
+                    <img
+                      src="{{ url_for('static', filename='assets/component.png') }}"
+                      alt="Component"
+                      class="section-icon"
+                    />
+                    Component Type
+                  </h3>
+                </div>
+
+                <div id="componentTypeGrid" class="component-type-grid">
+                  <div
+                    class="component-type-card active"
+                    data-type="capacitor"
+                    onclick="app.selectComponentType('capacitor')"
+                  >
+                    <div class="card-icon">
+                      <img
+                        src="{{ url_for('static', filename='assets/capacitor.png') }}"
+                        alt="Capacitor"
+                        class="component-icon"
+                      />
+                    </div>
+                    <span>Capacitors</span>
+                  </div>
+
+                  <div
+                    class="component-type-card disabled"
+                    data-type="resistor"
+                    onclick="app.showComingSoon('Resistors')"
+                  >
+                    <div class="card-icon">
+                      <img
+                        src="{{ url_for('static', filename='assets/resistor.png') }}"
+                        alt="Resistor"
+                        class="component-icon"
+                      />
+                    </div>
+                    <span>Resistors</span>
+                    <div class="soon-badge">Soon</div>
+                  </div>
+
+                  <div
+                    class="component-type-card disabled"
+                    data-type="inductor"
+                    onclick="app.showComingSoon('Inductors')"
+                  >
+                    <div class="card-icon">
+                      <img
+                        src="{{ url_for('static', filename='assets/inductor.png') }}"
+                        alt="Inductor"
+                        class="component-icon"
+                      />
+                    </div>
+                    <span>Inductors</span>
+                    <div class="soon-badge">Soon</div>
+                  </div>
+
+                  <div
+                    class="component-type-card disabled"
+                    data-type="diode"
+                    onclick="app.showComingSoon('Diode')"
+                  >
+                    <div class="card-icon">
+                      <img
+                        src="{{ url_for('static', filename='assets/diode.png') }}"
+                        alt="diode"
+                        class="component-icon"
+                      />
+                    </div>
+                    <span>Diode</span>
+                    <div class="soon-badge">Soon</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Configuration Panel -->
+              <div class="configuration-panel">
+                <div class="section-header">
+                  <h3>
+                    <img
+                      src="{{ url_for('static', filename='assets/configuration.png') }}"
+                      alt="Settings"
+                      class="section-icon"
+                    />
+                    Configuration
+                  </h3>
+                  <div class="panel-actions">
+                    <button
+                      class="btn btn-success btn-sm"
+                      onclick="app.addComponent()"
+                    >
+                      <i class="fas fa-plus"></i> Add Component
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Global Parameters -->
+                <div class="global-parameters">
+                  <h4>Global Parameters</h4>
+                  <div class="param-grid">
+                    <div class="param-group">
+                      <label for="globalTemperature">Temperature (°C)</label>
+                      <input
+                        type="number"
+                        id="globalTemperature"
+                        step="0.1"
+                        value="25"
+                        required
+                      />
+                    </div>
+                    <div class="param-group">
+                      <label for="globalEnvironment">Environment</label>
+                      <select id="globalEnvironment" required>
+                        <option value="">Select...</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Components Container -->
+                <div class="components-section">
+                  <h4>Components</h4>
+                  <div id="componentsContainer" class="components-container">
+                    <!-- Components will be added here -->
+                  </div>
+                </div>
+
+                <!-- Calculation Section -->
+                <div class="calculation-section">
+                  <button
+                    id="calculateButton"
+                    class="btn btn-primary btn-large"
+                    onclick="app.calculate()"
+                    disabled
+                  >
+                    <i class="fas fa-play"></i> Calculate Reliability
+                  </button>
+
+                  <!-- Loading indicator -->
+                  <div
+                    id="loadingIndicator"
+                    class="loading-indicator"
+                    style="display: none"
+                  >
+                    <i class="fas fa-spinner fa-spin"></i> Calculating...
+                  </div>
+                </div>
+              </div>
+
+              <!-- Results Section -->
+              <div
+                id="resultsContainer"
+                class="results-container"
+                style="display: none"
+              >
+                <!-- Results will be displayed here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Project Info Edit Modal -->
+    <div id="projectInfoModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-edit"></i> Edit Project Information</h3>
+          <span class="modal-close" onclick="app.closeModal('projectInfoModal')"
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body">
+          <form id="editProjectInfoForm">
+            <div class="form-group">
+              <label for="editProjectName">Project Name *</label>
+              <input
+                type="text"
+                id="editProjectName"
+                name="editProjectName"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="editProjectDescription">Description</label>
+              <textarea
+                id="editProjectDescription"
+                name="editProjectDescription"
+                rows="4"
+              ></textarea>
+            </div>
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="app.closeModal('projectInfoModal')"
+              >
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-file-export"></i> Export Project</h3>
+          <span class="modal-close" onclick="app.closeModal('exportModal')"
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body">
+          <div class="export-options">
+            <button class="btn btn-primary export-btn" data-format="json">
+              <i class="fas fa-file-code"></i> Export as JSON
+            </button>
+            <button class="btn btn-success export-btn" data-format="excel">
+              <i class="fas fa-file-excel"></i> Export as Excel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+          <span class="modal-close" onclick="app.closeModal('errorModal')"
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body">
+          <div id="errorMessage"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coming Soon Modal -->
+    <div id="comingSoonModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-clock"></i> Coming Soon</h3>
+          <span class="modal-close" onclick="app.closeModal('comingSoonModal')"
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body">
+          <div id="comingSoonMessage" class="coming-soon-content">
+            <div class="coming-soon-icon">
+              <i class="fas fa-tools"></i>
+            </div>
+            <p>
+              This component type is currently under development and will be
+              available in a future update.
+            </p>
+            <p>Stay tuned for more component types!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Input for Opening Projects -->
+    <input
+      type="file"
+      id="fileInput"
+      accept=".json"
+      style="display: none"
+      onchange="app.handleFileSelect(event)"
+    />
+    <input
+      type="file"
+      id="excelFileInput"
+      accept=".xlsx,.xls"
+      style="display: none"
+      onchange="app.handleExcelFileSelect(event)"
+    />
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>
