@@ -29,6 +29,19 @@ def create_database():
     populate_quality_factors(cursor)
     populate_environment_factors(cursor)
     
+    # Setelah populate_environment_factors(cursor)
+    populate_resistor_styles(cursor)
+    populate_resistor_temperature_factors(cursor)
+    populate_resistor_power_factors(cursor)
+    populate_resistor_stress_factors(cursor)
+    populate_resistor_quality_factors(cursor)
+    populate_resistor_environment_factors(cursor)
+
+    populate_inductor_styles(cursor)
+    populate_inductor_temperature_factors(cursor)
+    populate_inductor_quality_factors(cursor)
+    populate_inductor_environment_factors(cursor)
+
     conn.commit()
     conn.close()
     print(f"Database created successfully at: {db_path}")
@@ -141,6 +154,113 @@ def create_tables(cursor):
         description TEXT,
         manufacturer TEXT,
         part_number TEXT,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+        # Resistor styles table
+    cursor.execute('''
+    CREATE TABLE resistor_styles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        style TEXT NOT NULL,
+        spec_number TEXT,
+        description TEXT,
+        lambda_b REAL NOT NULL,
+        pi_t_column INTEGER,
+        pi_s_column INTEGER,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Resistor temperature factor table
+    cursor.execute('''
+    CREATE TABLE resistor_temperature_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        temperature INTEGER NOT NULL,
+        column_1 REAL,
+        column_2 REAL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Resistor power factor table
+    cursor.execute('''
+    CREATE TABLE resistor_power_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        power_dissipation REAL NOT NULL,
+        pi_p REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Resistor stress factor table
+    cursor.execute('''
+    CREATE TABLE resistor_stress_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        power_stress REAL NOT NULL,
+        column_1 REAL,
+        column_2 REAL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Resistor quality factor table
+    cursor.execute('''
+    CREATE TABLE resistor_quality_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quality_level TEXT NOT NULL,
+        pi_q REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Resistor environment factor table
+    cursor.execute('''
+    CREATE TABLE resistor_environment_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        environment TEXT NOT NULL,
+        pi_e REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+        # Inductor styles table
+    cursor.execute('''
+    CREATE TABLE inductor_styles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inductor_type TEXT NOT NULL,
+        lambda_b REAL NOT NULL,
+        pi_t_column INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Inductor temperature factor table
+    cursor.execute('''
+    CREATE TABLE inductor_temperature_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        temperature INTEGER NOT NULL,
+        pi_t REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Inductor quality factor table
+    cursor.execute('''
+    CREATE TABLE inductor_quality_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quality_level TEXT NOT NULL,
+        pi_q REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
+    )
+    ''')
+
+    # Inductor environment factor table
+    cursor.execute('''
+    CREATE TABLE inductor_environment_factors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        environment TEXT NOT NULL,
+        pi_e REAL NOT NULL,
         created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
     )
     ''')
@@ -325,6 +445,244 @@ def populate_environment_factors(cursor):
         INSERT INTO series_resistance_factors (resistance_range, pi_sr)
         VALUES (?, ?)
     ''', resistance_data)
+
+def populate_resistor_styles(cursor):
+    """Populate resistor styles from MIL-HDBK-217F data"""
+    
+    resistor_data = [
+        ('RC', '11', 'Resistor, Fixed, Composition (Insulated)', 0.0017, 1, 2),
+        ('RCR', '39008', 'Resistor, Fixed, Composition (Insulated) Est. Rel.', 0.0017, 1, 2),
+        ('RL', '22684', 'Resistor, Fixed, Film, Insulated', 0.0037, 2, 1),
+        ('RLR', '39017', 'Resistor, Fixed, Film (Insulated), Est. Rel.', 0.0037, 2, 1),
+        ('RN (R, C or N)', '55182', 'Resistor, Fixed, Film, Established Reliability', 0.0037, 2, 1),
+        ('RM', '55342', 'Resistor, Fixed, Film, Chip, Established Reliability', 0.0037, 2, 1),
+        ('RN', '10509', 'Resistor, Fixed Film (High Stability)', 0.0037, 2, 1),
+        ('RD', '11804', 'Resistor, Fixed, Film (Power Type)', 0.0037, 1, 1),
+        ('RZ', '83401', 'Resistor Networks, Fixed, Film', 0.0019, 1, 1),
+        ('RB', '93', 'Resistor, Fixed, Wirewound (Accurate)', 0.0024, 2, 1),
+        ('RBR', '39005', 'Resistor, Fixed, Wirewound (Accurate) Est. Rel.', 0.0024, 2, 1),
+        ('RW', '26', 'Resistor, Fixed, Wirewound (Power Type)', 0.0024, 2, 2),
+        ('RWR', '39007', 'Resistor, Fixed, Wirewound (Power Type) Est. Rel.', 0.0024, 2, 2),
+        ('RE', '18546', 'Resistor, Fixed, Wirewound (Power Type, Chassis Mounted)', 0.0024, 2, 2),
+        ('RER', '39009', 'Resistor, Fixed, Wirewound (Power Type, Chassis Mounted) Est. Rel.', 0.0024, 2, 2),
+        ('RTH', '23648', 'Thermistor, (Thermally Sensitive Resistor), Insulated', 0.0019, 1, 1),
+        ('RT', '27208', 'Resistor, Variable, Wirewound (Lead Screw Activated)', 0.0024, 2, 1),
+        ('RTR', '39015', 'Resistor, Variable, Wirewound (Lead Screw Activated), Established Reliability', 0.0024, 2, 1),
+        ('RR', '12934', 'Resistor, Variable, Wirewound, Precision', 0.0024, 2, 1),
+        ('RA', '19', 'Resistor, Variable, Wirewound (Low Operating Temperature)', 0.0024, 1, 1),
+        ('RK', '39002', 'Resistor, Variable, Wirewound, Semi-Precision', 0.0024, 1, 1),
+        ('RP', '22', 'Resistor, Wirewound, Power Type', 0.0024, 2, 1),
+        ('RJ', '22097', 'Resistor, Variable, Nonwirewound', 0.0037, 2, 1),
+        ('RJR', '39035', 'Resistor, Variable, Nonwirewound Est. Rel.', 0.0037, 2, 1),
+        ('RV', '94', 'Resistor, Variable, Composition', 0.0037, 2, 1),
+        ('RQ', '39023', 'Resistor, Variable, Nonwirewound, Precision', 0.0037, 1, 1),
+        ('RVC', '23285', 'Resistor, Variable, Nonwirewound', 0.0037, 1, 1)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_styles 
+        (style, spec_number, description, lambda_b, pi_t_column, pi_s_column)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', resistor_data)
+
+def populate_resistor_temperature_factors(cursor):
+    """Populate resistor temperature factors"""
+    
+    temp_data = [
+        (20, 0.88, 0.95),
+        (30, 1.1, 1.1),
+        (40, 1.5, 1.2),
+        (50, 1.8, 1.3),
+        (60, 2.3, 1.4),
+        (70, 2.8, 1.5),
+        (80, 3.4, 1.6),
+        (90, 4.0, 1.7),
+        (100, 4.8, 1.9),
+        (110, 5.6, 2.0),
+        (120, 6.6, 2.1),
+        (130, 7.6, 2.3),
+        (140, 8.7, 2.4),
+        (150, 10, 2.5)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_temperature_factors (temperature, column_1, column_2)
+        VALUES (?, ?, ?)
+    ''', temp_data)
+
+def populate_resistor_power_factors(cursor):
+    """Populate resistor power dissipation factors"""
+    
+    power_data = [
+        (0.001, 0.068),
+        (0.01, 0.17),
+        (0.13, 0.44),
+        (0.25, 0.58),
+        (0.50, 0.76),
+        (0.75, 0.89),
+        (1.0, 1.0),
+        (2.0, 1.3),
+        (3.0, 1.5),
+        (4.0, 1.7),
+        (5.0, 1.9),
+        (10, 2.5),
+        (25, 3.5),
+        (50, 4.6),
+        (100, 6.0),
+        (150, 7.1)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_power_factors (power_dissipation, pi_p)
+        VALUES (?, ?)
+    ''', power_data)
+
+def populate_resistor_stress_factors(cursor):
+    """Populate resistor power stress factors"""
+    
+    stress_data = [
+        (0.1, 0.79, 0.66),
+        (0.2, 0.88, 0.81),
+        (0.3, 0.99, 1.0),
+        (0.4, 1.1, 1.2),
+        (0.5, 1.2, 1.5),
+        (0.6, 1.4, 1.8),
+        (0.7, 1.5, 2.3),
+        (0.8, 1.7, 2.8),
+        (0.9, 1.9, 3.4)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_stress_factors (power_stress, column_1, column_2)
+        VALUES (?, ?, ?)
+    ''', stress_data)
+
+def populate_resistor_quality_factors(cursor):
+    """Populate resistor quality factors"""
+    
+    quality_data = [
+        ('S', 0.03),
+        ('R', 0.1),
+        ('P', 0.3),
+        ('M', 1.0),
+        ('Non-Established Reliability', 3.0),
+        ('Commercial or Unknown', 10)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_quality_factors (quality_level, pi_q)
+        VALUES (?, ?)
+    ''', quality_data)
+
+def populate_resistor_environment_factors(cursor):
+    """Populate resistor environment factors"""
+    
+    environment_data = [
+        ('GB', 1.0),
+        ('GF', 4.0),
+        ('GM', 16),
+        ('NS', 12),
+        ('NU', 42),
+        ('AIC', 18),
+        ('AIF', 23),
+        ('AUC', 31),
+        ('AUF', 43),
+        ('ARW', 63),
+        ('SF', 0.50),
+        ('MF', 37),
+        ('ML', 87),
+        ('CL', 1728)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO resistor_environment_factors (environment, pi_e)
+        VALUES (?, ?)
+    ''', environment_data)
+
+def populate_inductor_styles(cursor):
+    """Populate inductor styles from MIL-HDBK-217F data"""
+    
+    inductor_data = [
+        ('Fixed Inductor or Choke', 0.000030, 1),
+        ('Variable Inductor', 0.000050, 1)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO inductor_styles 
+        (inductor_type, lambda_b, pi_t_column)
+        VALUES (?, ?, ?)
+    ''', inductor_data)
+
+def populate_inductor_temperature_factors(cursor):
+    """Populate inductor temperature factors"""
+    
+    temp_data = [
+        (20, 0.93),
+        (30, 1.1),
+        (40, 1.2),
+        (50, 1.4),
+        (60, 1.6),
+        (70, 1.8),
+        (80, 1.9),
+        (90, 2.2),
+        (100, 2.4),
+        (110, 2.6),
+        (120, 2.8),
+        (130, 3.1),
+        (140, 3.3),
+        (150, 3.5),
+        (160, 3.8),
+        (170, 4.1),
+        (180, 4.3),
+        (190, 4.6)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO inductor_temperature_factors (temperature, pi_t)
+        VALUES (?, ?)
+    ''', temp_data)
+
+def populate_inductor_quality_factors(cursor):
+    """Populate inductor quality factors"""
+    
+    quality_data = [
+        ('S', 0.03),
+        ('R', 0.10),
+        ('P', 0.30),
+        ('M', 1.0),
+        ('MIL-SPEC', 1.0),
+        ('Lower', 3.0)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO inductor_quality_factors (quality_level, pi_q)
+        VALUES (?, ?)
+    ''', quality_data)
+
+def populate_inductor_environment_factors(cursor):
+    """Populate inductor environment factors"""
+    
+    environment_data = [
+        ('GB', 1.0),
+        ('GF', 6.0),
+        ('GM', 12),
+        ('NS', 5.0),
+        ('NU', 16),
+        ('AIC', 6.0),
+        ('AIF', 8.0),
+        ('AUC', 7.0),
+        ('AUF', 9.0),
+        ('ARW', 24),
+        ('SF', 0.50),
+        ('MF', 13),
+        ('ML', 34),
+        ('CL', 610)
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO inductor_environment_factors (environment, pi_e)
+        VALUES (?, ?)
+    ''', environment_data)
 
 def calculate_temperature_factor(temperature, column):
     """Calculate temperature factor using equation if not in table"""

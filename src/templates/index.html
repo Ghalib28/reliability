@@ -226,13 +226,50 @@
                     alt="Formula"
                     class="section-icon"
                   />
-                  Formula Capacitor
+                  Formulas
                 </h3>
+
+                <h4
+                  style="
+                    color: var(--primary-color);
+                    margin-top: 1rem;
+                    margin-bottom: 0.5rem;
+                  "
+                >
+                  Capacitor
+                </h4>
                 <div class="formula">
                   λ<sub>P</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>C</sub>
                   × π<sub>V</sub> × π<sub>Q</sub> × π<sub>E</sub> × π<sub
                     >SR</sub
                   >
+                </div>
+
+                <h4
+                  style="
+                    color: var(--success-color);
+                    margin-top: 1rem;
+                    margin-bottom: 0.5rem;
+                  "
+                >
+                  Resistor
+                </h4>
+                <div class="formula" style="border-color: var(--success-color)">
+                  λ<sub>P</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>P</sub>
+                  × π<sub>S</sub> × π<sub>Q</sub> × π<sub>E</sub>
+                </div>
+                <h4
+                  style="
+                    color: var(--warning-color);
+                    margin-top: 1rem;
+                    margin-bottom: 0.5rem;
+                  "
+                >
+                  Inductor
+                </h4>
+                <div class="formula" style="border-color: var(--warning-color)">
+                  λ<sub>P</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>Q</sub>
+                  × π<sub>E</sub>
                 </div>
                 <ul class="formula-legend">
                   <li>
@@ -242,6 +279,8 @@
                   <li><strong>π<sub>T</sub>:</strong> Temperature factor</li>
                   <li><strong>π<sub>C</sub>:</strong> Capacitance factor</li>
                   <li><strong>π<sub>V</sub>:</strong> Voltage stress factor</li>
+                  <li><strong>π<sub>P</sub>:</strong> Power factor</li>
+                  <li><strong>π<sub>S</sub>:</strong> Power stress factor</li>
                   <li><strong>π<sub>Q</sub>:</strong> Quality factor</li>
                   <li><strong>π<sub>E</sub>:</strong> Environment factor</li>
                   <li>
@@ -283,9 +322,9 @@
                   </div>
 
                   <div
-                    class="component-type-card disabled"
+                    class="component-type-card"
                     data-type="resistor"
-                    onclick="app.showComingSoon('Resistors')"
+                    onclick="app.selectComponentType('resistor')"
                   >
                     <div class="card-icon">
                       <img
@@ -295,13 +334,12 @@
                       />
                     </div>
                     <span>Resistors</span>
-                    <div class="soon-badge">Soon</div>
                   </div>
 
                   <div
-                    class="component-type-card disabled"
+                    class="component-type-card"
                     data-type="inductor"
-                    onclick="app.showComingSoon('Inductors')"
+                    onclick="app.selectComponentType('inductor')"
                   >
                     <div class="card-icon">
                       <img
@@ -311,7 +349,6 @@
                       />
                     </div>
                     <span>Inductors</span>
-                    <div class="soon-badge">Soon</div>
                   </div>
 
                   <div

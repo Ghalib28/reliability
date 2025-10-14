@@ -15,6 +15,21 @@ class EnhancedReliabilityCalculator {
     this.capacitorStyles = [];
     this.qualityLevels = [];
     this.environments = [];
+    this.resistorStyles = [];
+    this.resistorQualityLevels = [];
+    this.resistorEnvironments = [];
+    this.componentCounters = {
+      capacitor: 0,
+      resistor: 0,
+    };
+    this.inductorStyles = [];
+    this.inductorQualityLevels = [];
+    this.inductorEnvironments = [];
+    this.componentCounters = {
+      capacitor: 0,
+      resistor: 0,
+      inductor: 0,
+    };
     this.currentResults = null;
     this.collapsedComponents = new Set();
 
@@ -37,19 +52,51 @@ class EnhancedReliabilityCalculator {
 
   async loadStaticData() {
     try {
-      const [stylesResponse, qualityResponse, envResponse] = await Promise.all([
+      const [
+        stylesResponse,
+        qualityResponse,
+        envResponse,
+        resistorStylesResponse,
+        resistorQualityResponse,
+        resistorEnvResponse,
+        inductorStylesResponse,
+        inductorQualityResponse,
+        inductorEnvResponse,
+      ] = await Promise.all([
         fetch("/api/capacitor-styles"),
         fetch("/api/quality-levels"),
         fetch("/api/environments"),
+        fetch("/api/resistor-styles"),
+        fetch("/api/resistor-quality-levels"),
+        fetch("/api/resistor-environments"),
+        fetch("/api/inductor-styles"),
+        fetch("/api/inductor-quality-levels"),
+        fetch("/api/inductor-environments"),
       ]);
 
-      if (!stylesResponse.ok || !qualityResponse.ok || !envResponse.ok) {
+      if (
+        !stylesResponse.ok ||
+        !qualityResponse.ok ||
+        !envResponse.ok ||
+        !resistorStylesResponse.ok ||
+        !resistorQualityResponse.ok ||
+        !resistorEnvResponse.ok ||
+        !inductorStylesResponse.ok ||
+        !inductorQualityResponse.ok ||
+        !inductorEnvResponse.ok
+      ) {
         throw new Error("Failed to load application data");
       }
 
       this.capacitorStyles = await stylesResponse.json();
       this.qualityLevels = await qualityResponse.json();
       this.environments = await envResponse.json();
+      this.resistorStyles = await resistorStylesResponse.json();
+      this.resistorQualityLevels = await resistorQualityResponse.json();
+      this.resistorEnvironments = await resistorEnvResponse.json();
+      this.inductorStyles = await inductorStylesResponse.json();
+      this.inductorQualityLevels = await inductorQualityResponse.json();
+      this.inductorEnvironments = await inductorEnvResponse.json();
 
       console.log("Static data loaded successfully");
     } catch (error) {
@@ -518,23 +565,24 @@ class EnhancedReliabilityCalculator {
 
   // Component Type Selection
   selectComponentType(type) {
-    this.selectedComponentType = type;
+    if (type === "resistor" || type === "capacitor" || type === "inductor") {
+      this.selectedComponentType = type;
 
-    // Update UI to show selected type
-    document.querySelectorAll(".component-type-mini-card").forEach((card) => {
-      card.classList.remove("active");
-      if (card.dataset.type === type) {
-        card.classList.add("active");
+      document.querySelectorAll(".component-type-card").forEach((card) => {
+        card.classList.remove("active");
+        if (card.dataset.type === type) {
+          card.classList.add("active");
+        }
+      });
+
+      this.updateCalculateButton();
+
+      if (this.currentProject) {
+        this.currentProject.selectedComponentType = type;
+        this.currentProject.modifiedAt = new Date().toISOString();
       }
-    });
-
-    // Enable calculate button if components exist
-    this.updateCalculateButton();
-
-    // Store in current project
-    if (this.currentProject) {
-      this.currentProject.selectedComponentType = type;
-      this.currentProject.modifiedAt = new Date().toISOString();
+    } else {
+      this.showComingSoon(type);
     }
   }
 
@@ -633,13 +681,25 @@ class EnhancedReliabilityCalculator {
       return;
     }
 
-    this.componentCounter++;
+    // Increment counter for specific component type
+    this.componentCounters[this.selectedComponentType]++;
+    const componentId = `${this.selectedComponentType}_${
+      this.componentCounters[this.selectedComponentType]
+    }`;
 
     const componentForm = document.createElement("div");
     componentForm.className = "component-form";
-    componentForm.dataset.componentId = this.componentCounter;
+    componentForm.dataset.componentId = componentId;
+    componentForm.dataset.componentType = this.selectedComponentType;
 
-    componentForm.innerHTML = this.generateComponentHTML(this.componentCounter);
+    if (this.selectedComponentType === "resistor") {
+      componentForm.innerHTML = this.generateResistorHTML(componentId);
+    } else if (this.selectedComponentType === "inductor") {
+      componentForm.innerHTML = this.generateInductorHTML(componentId);
+    } else {
+      componentForm.innerHTML = this.generateCapacitorHTML(componentId);
+    }
+
     container.appendChild(componentForm);
 
     // Animate appearance
@@ -654,7 +714,6 @@ class EnhancedReliabilityCalculator {
 
     this.updateCalculateButton();
 
-    // Scroll to new component
     setTimeout(() => {
       componentForm.scrollIntoView({
         behavior: "smooth",
@@ -663,99 +722,255 @@ class EnhancedReliabilityCalculator {
     }, 350);
   }
 
-  generateComponentHTML(id) {
+  generateCapacitorHTML(id) {
     const isCollapsed = this.collapsedComponents.has(id);
+    const componentNumber = this.componentCounters.capacitor;
 
     return `
-      <div class="component-header">
-        <h3 class="component-title">
-          <i class="fas fa-microchip"></i>
-          ${
-            this.selectedComponentType?.charAt(0).toUpperCase() +
-            this.selectedComponentType?.slice(1)
-          } ${id}
-        </h3>
-        <div class="component-actions">
-          <button type="button" class="component-toggle" onclick="app.toggleComponent(${id})">
-            <i class="fas fa-${
-              isCollapsed ? "chevron-down" : "chevron-up"
-            }"></i>
-          </button>
-          <button type="button" class="remove-component" onclick="app.removeComponent(${id})">
-            <i class="fas fa-times"></i>
-          </button>
+    <div class="component-header">
+      <h3 class="component-title">
+        <i class="fas fa-microchip"></i>
+        Capacitor ${componentNumber}
+      </h3>
+      <div class="component-actions">
+        <button type="button" class="component-toggle" onclick="app.toggleComponent('${id}')">
+          <i class="fas fa-${isCollapsed ? "chevron-down" : "chevron-up"}"></i>
+        </button>
+        <button type="button" class="remove-component" onclick="app.removeComponent('${id}')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="component-content ${isCollapsed ? "collapsed" : ""}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="description_${id}">Description</label>
+          <input type="text" id="description_${id}" required placeholder="e.g., Main filter capacitor">
+        </div>
+        
+        <div class="form-group">
+          <label for="manufacturer_${id}">Manufacturer</label>
+          <input type="text" id="manufacturer_${id}" placeholder="e.g., Vishay, Murata, TDK">
+        </div>
+        
+        <div class="form-group">
+          <label for="part_number_${id}">Part Number</label>
+          <input type="text" id="part_number_${id}" placeholder="e.g., VJ1206Y104KXJPW1BC">
+        </div>
+        
+        <div class="form-group">
+          <label for="style_${id}">Capacitor Style</label>
+          <select id="style_${id}" required>
+            <option value="">Select Style...</option>
+            ${this.capacitorStyles
+              .map(
+                (style) => `
+              <option value="${style.style}" title="${style.description}">
+                ${style.style} - ${style.spec_number} (λb: ${style.lambda_b})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="capacitance_${id}">Capacitance (μF)</label>
+          <input type="number" id="capacitance_${id}" step="0.000001" value="1.0" required placeholder="Capacitance value">
+        </div>
+        
+        <div class="form-group">
+          <label for="voltage_stress_${id}">Voltage Stress Ratio (S)</label>
+          <input type="number" id="voltage_stress_${id}" step="0.01" min="0" max="1.5" value="0.5" required placeholder="0.0 to 1.5">
+          <small>Operating voltage / Rated voltage</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="quality_${id}">Quality Level</label>
+          <select id="quality_${id}" required>
+            ${this.qualityLevels
+              .map(
+                (quality) => `
+              <option value="${quality.quality_level}" ${
+                  quality.quality_level === "M" ? "selected" : ""
+                }>
+                ${quality.quality_level} (πQ: ${quality.pi_q})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="series_resistance_${id}">Series Resistance (Ω)</label>
+          <input type="number" id="series_resistance_${id}" step="0.01" value="1" placeholder="For tantalum capacitors">
+          <small>Only applicable to tantalum capacitors</small>
         </div>
       </div>
-      
-      <div class="component-content ${isCollapsed ? "collapsed" : ""}">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="description_${id}">Description *</label>
-            <input type="text" id="description_${id}" required placeholder="e.g., Main filter capacitor">
-          </div>
-          
-          <div class="form-group">
-            <label for="manufacturer_${id}">Manufacturer</label>
-            <input type="text" id="manufacturer_${id}" placeholder="e.g., Vishay, Murata, TDK">
-          </div>
-          
-          <div class="form-group">
-            <label for="part_number_${id}">Part Number</label>
-            <input type="text" id="part_number_${id}" placeholder="e.g., VJ1206Y104KXJPW1BC">
-          </div>
-          
-          <div class="form-group">
-            <label for="style_${id}">Capacitor Style *</label>
-            <select id="style_${id}" required>
-              <option value="">Select Style...</option>
-              ${this.capacitorStyles
-                .map(
-                  (style) => `
-                <option value="${style.style}" title="${style.description}">
-                  ${style.style} - ${style.spec_number} (λb: ${style.lambda_b})
-                </option>
-              `
-                )
-                .join("")}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="capacitance_${id}">Capacitance (μF) *</label>
-            <input type="number" id="capacitance_${id}" step="0.000001" value="1.0" required placeholder="Capacitance value">
-          </div>
-          
-          <div class="form-group">
-            <label for="voltage_stress_${id}">Voltage Stress Ratio (S) *</label>
-            <input type="number" id="voltage_stress_${id}" step="0.01" min="0" max="1.5" value="0.5" required placeholder="0.0 to 1.5">
-            <small>Operating voltage / Rated voltage</small>
-          </div>
-          
-          <div class="form-group">
-            <label for="quality_${id}">Quality Level *</label>
-            <select id="quality_${id}" required>
-              ${this.qualityLevels
-                .map(
-                  (quality) => `
-                <option value="${quality.quality_level}" ${
-                    quality.quality_level === "M" ? "selected" : ""
-                  }>
-                  ${quality.quality_level} (πQ: ${quality.pi_q})
-                </option>
-              `
-                )
-                .join("")}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="series_resistance_${id}">Series Resistance (Ω)</label>
-            <input type="number" id="series_resistance_${id}" step="0.01" value="1" placeholder="For tantalum capacitors">
-            <small>Only applicable to tantalum capacitors</small>
-          </div>
-        </div>
-      </div>
+    </div>
     `;
+  }
+
+  generateResistorHTML(id) {
+    const isCollapsed = this.collapsedComponents.has(id);
+    const componentNumber = this.componentCounters.resistor;
+
+    return `
+    <div class="component-header">
+      <h3 class="component-title">
+        <i class="fas fa-resistor"></i>
+        Resistor ${componentNumber}
+      </h3>
+      <div class="component-actions">
+        <button type="button" class="component-toggle" onclick="app.toggleComponent('${id}')">
+          <i class="fas fa-${isCollapsed ? "chevron-down" : "chevron-up"}"></i>
+        </button>
+        <button type="button" class="remove-component" onclick="app.removeComponent('${id}')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="component-content ${isCollapsed ? "collapsed" : ""}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="description_${id}">Description</label>
+          <input type="text" id="description_${id}" required placeholder="e.g., Pull-up resistor">
+        </div>
+        
+        <div class="form-group">
+          <label for="manufacturer_${id}">Manufacturer</label>
+          <input type="text" id="manufacturer_${id}" placeholder="e.g., Yageo, Vishay, KOA">
+        </div>
+        
+        <div class="form-group">
+          <label for="part_number_${id}">Part Number</label>
+          <input type="text" id="part_number_${id}" placeholder="e.g., RC0603FR-0710KL">
+        </div>
+        
+        <div class="form-group">
+          <label for="style_${id}">Resistor Style</label>
+          <select id="style_${id}" required>
+            <option value="">Select Style...</option>
+            ${this.resistorStyles
+              .map(
+                (style) => `
+              <option value="${style.style}" title="${style.description}">
+                ${style.style} - ${style.spec_number} (λb: ${style.lambda_b})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="watts_${id}">Power Dissipation (Watts)</label>
+          <input type="number" id="watts_${id}" step="0.001" value="0.125" required placeholder="Actual power in Watts">
+          <small>Actual power dissipated by resistor</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="power_stress_${id}">Power Stress (S)</label>
+          <input type="number" id="power_stress_${id}" step="0.01" min="0" max="1" value="0.5" required placeholder="0.0 to 1.0">
+          <small>Operating power / Rated power</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="quality_${id}">Quality Level</label>
+          <select id="quality_${id}" required>
+            ${this.resistorQualityLevels
+              .map(
+                (quality) => `
+              <option value="${quality.quality_level}" ${
+                  quality.quality_level === "M" ? "selected" : ""
+                }>
+                ${quality.quality_level} (πQ: ${quality.pi_q})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  generateInductorHTML(id) {
+    const isCollapsed = this.collapsedComponents.has(id);
+    const componentNumber = this.componentCounters.inductor;
+
+    return `
+    <div class="component-header">
+      <h3 class="component-title">
+        <i class="fas fa-circle"></i>
+        Inductor ${componentNumber}
+      </h3>
+      <div class="component-actions">
+        <button type="button" class="component-toggle" onclick="app.toggleComponent('${id}')">
+          <i class="fas fa-${isCollapsed ? "chevron-down" : "chevron-up"}"></i>
+        </button>
+        <button type="button" class="remove-component" onclick="app.removeComponent('${id}')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="component-content ${isCollapsed ? "collapsed" : ""}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="description_${id}">Description *</label>
+          <input type="text" id="description_${id}" required placeholder="e.g., Filter choke">
+        </div>
+        
+        <div class="form-group">
+          <label for="manufacturer_${id}">Manufacturer</label>
+          <input type="text" id="manufacturer_${id}" placeholder="e.g., Coilcraft, Murata">
+        </div>
+        
+        <div class="form-group">
+          <label for="part_number_${id}">Part Number</label>
+          <input type="text" id="part_number_${id}" placeholder="e.g., XAL5030-472MEB">
+        </div>
+        
+        <div class="form-group">
+          <label for="inductor_type_${id}">Inductor Type *</label>
+          <select id="inductor_type_${id}" required>
+            <option value="">Select Type...</option>
+            ${this.inductorStyles
+              .map(
+                (style) => `
+              <option value="${style.inductor_type}">
+                ${style.inductor_type} (λb: ${style.lambda_b})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="quality_${id}">Quality Level *</label>
+          <select id="quality_${id}" required>
+            ${this.inductorQualityLevels
+              .map(
+                (quality) => `
+              <option value="${quality.quality_level}" ${
+                  quality.quality_level === "MIL-SPEC" ? "selected" : ""
+                }>
+                ${quality.quality_level} (πQ: ${quality.pi_q})
+              </option>
+            `
+              )
+              .join("")}
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
   }
 
   toggleComponent(componentId) {
@@ -823,34 +1038,79 @@ class EnhancedReliabilityCalculator {
 
     componentForms.forEach((form) => {
       const id = form.dataset.componentId;
+      const componentType = form.dataset.componentType;
 
-      const component = {
-        project_name: this.currentProject?.name || "Unknown Project",
-        name: `${
-          this.selectedComponentType?.charAt(0).toUpperCase() +
-          this.selectedComponentType?.slice(1)
-        }_${id}`, // Ubah ini
-        description: document.getElementById(`description_${id}`)?.value || "",
-        manufacturer:
-          document.getElementById(`manufacturer_${id}`)?.value || "",
-        part_number: document.getElementById(`part_number_${id}`)?.value || "",
-        style: document.getElementById(`style_${id}`)?.value || "",
-        temperature: this.globalParameters.temperature,
-        capacitance:
-          parseFloat(document.getElementById(`capacitance_${id}`)?.value) ||
-          1.0,
-        voltage_stress:
-          parseFloat(document.getElementById(`voltage_stress_${id}`)?.value) ||
-          0.5,
-        quality_level: document.getElementById(`quality_${id}`)?.value || "M",
-        environment: this.globalParameters.environment,
-        series_resistance:
-          parseFloat(
-            document.getElementById(`series_resistance_${id}`)?.value
-          ) || 1,
-      };
-
-      components.push(component);
+      if (componentType === "resistor") {
+        const component = {
+          component_type: "resistor",
+          project_name: this.currentProject?.name || "Unknown Project",
+          name: id.replace("_", " "),
+          description:
+            document.getElementById(`description_${id}`)?.value || "",
+          manufacturer:
+            document.getElementById(`manufacturer_${id}`)?.value || "",
+          part_number:
+            document.getElementById(`part_number_${id}`)?.value || "",
+          style: document.getElementById(`style_${id}`)?.value || "",
+          temperature: this.globalParameters.temperature,
+          watts:
+            parseFloat(document.getElementById(`watts_${id}`)?.value) || 0.125,
+          power_stress:
+            parseFloat(document.getElementById(`power_stress_${id}`)?.value) ||
+            0.5,
+          quality_level: document.getElementById(`quality_${id}`)?.value || "M",
+          environment: this.globalParameters.environment,
+        };
+        components.push(component);
+      } else if (componentType === "inductor") {
+        const component = {
+          component_type: "inductor",
+          project_name: this.currentProject?.name || "Unknown Project",
+          name: id.replace("_", " "),
+          description:
+            document.getElementById(`description_${id}`)?.value || "",
+          manufacturer:
+            document.getElementById(`manufacturer_${id}`)?.value || "",
+          part_number:
+            document.getElementById(`part_number_${id}`)?.value || "",
+          inductor_type:
+            document.getElementById(`inductor_type_${id}`)?.value || "",
+          temperature: this.globalParameters.temperature,
+          quality_level:
+            document.getElementById(`quality_${id}`)?.value || "MIL-SPEC",
+          environment: this.globalParameters.environment,
+        };
+        components.push(component);
+      } else {
+        // Capacitor code remains the same
+        const component = {
+          component_type: "capacitor",
+          project_name: this.currentProject?.name || "Unknown Project",
+          name: id.replace("_", " "),
+          description:
+            document.getElementById(`description_${id}`)?.value || "",
+          manufacturer:
+            document.getElementById(`manufacturer_${id}`)?.value || "",
+          part_number:
+            document.getElementById(`part_number_${id}`)?.value || "",
+          style: document.getElementById(`style_${id}`)?.value || "",
+          temperature: this.globalParameters.temperature,
+          capacitance:
+            parseFloat(document.getElementById(`capacitance_${id}`)?.value) ||
+            1.0,
+          voltage_stress:
+            parseFloat(
+              document.getElementById(`voltage_stress_${id}`)?.value
+            ) || 0.5,
+          quality_level: document.getElementById(`quality_${id}`)?.value || "M",
+          environment: this.globalParameters.environment,
+          series_resistance:
+            parseFloat(
+              document.getElementById(`series_resistance_${id}`)?.value
+            ) || 1,
+        };
+        components.push(component);
+      }
     });
 
     return components;
@@ -861,30 +1121,56 @@ class EnhancedReliabilityCalculator {
     if (!container) return;
 
     container.innerHTML = "";
-    this.componentCounter = 0;
+    this.componentCounters = { capacitor: 0, resistor: 0, inductor: 0 }; // Pastikan ada inductor
 
-    components.forEach((comp, index) => {
+    components.forEach((comp) => {
+      const componentType = comp.component_type || "capacitor";
+      this.selectedComponentType = componentType;
       this.addComponent();
-      const id = this.componentCounter;
 
-      // Fill in the data
+      const currentCounter = this.componentCounters[componentType];
+      const id = `${componentType}_${currentCounter}`;
+
+      // Fill in common data
       const descInput = document.getElementById(`description_${id}`);
       const manuInput = document.getElementById(`manufacturer_${id}`);
       const partInput = document.getElementById(`part_number_${id}`);
-      const styleSelect = document.getElementById(`style_${id}`);
-      const capInput = document.getElementById(`capacitance_${id}`);
-      const voltInput = document.getElementById(`voltage_stress_${id}`);
       const qualitySelect = document.getElementById(`quality_${id}`);
-      const resInput = document.getElementById(`series_resistance_${id}`);
 
       if (descInput) descInput.value = comp.description || comp.name || "";
       if (manuInput) manuInput.value = comp.manufacturer || "";
       if (partInput) partInput.value = comp.part_number || "";
-      if (styleSelect) styleSelect.value = comp.style || "";
-      if (capInput) capInput.value = comp.capacitance || 1.0;
-      if (voltInput) voltInput.value = comp.voltage_stress || 0.5;
-      if (qualitySelect) qualitySelect.value = comp.quality_level || "M";
-      if (resInput) resInput.value = comp.series_resistance || 1;
+      if (qualitySelect)
+        qualitySelect.value =
+          comp.quality_level ||
+          (componentType === "inductor" ? "MIL-SPEC" : "M");
+
+      if (componentType === "capacitor") {
+        const styleSelect = document.getElementById(`style_${id}`);
+        const capInput = document.getElementById(`capacitance_${id}`);
+        const voltInput = document.getElementById(`voltage_stress_${id}`);
+        const resInput = document.getElementById(`series_resistance_${id}`);
+
+        if (styleSelect) styleSelect.value = comp.style || "";
+        if (capInput) capInput.value = comp.capacitance || 1.0;
+        if (voltInput) voltInput.value = comp.voltage_stress || 0.5;
+        if (resInput) resInput.value = comp.series_resistance || 1;
+      } else if (componentType === "resistor") {
+        const styleSelect = document.getElementById(`style_${id}`);
+        const wattsInput = document.getElementById(`watts_${id}`);
+        const powerStressInput = document.getElementById(`power_stress_${id}`);
+
+        if (styleSelect) styleSelect.value = comp.style || "";
+        if (wattsInput) wattsInput.value = comp.watts || 0.125;
+        if (powerStressInput) powerStressInput.value = comp.power_stress || 0.5;
+      } else if (componentType === "inductor") {
+        const inductorTypeSelect = document.getElementById(
+          `inductor_type_${id}`
+        );
+
+        if (inductorTypeSelect)
+          inductorTypeSelect.value = comp.inductor_type || "";
+      }
     });
   }
 
@@ -955,27 +1241,62 @@ class EnhancedReliabilityCalculator {
 
     components.forEach((component, index) => {
       const componentNum = index + 1;
+      const componentType = component.component_type || "capacitor";
 
       if (!component.name || !component.description) {
         errors.push(`Component ${componentNum}: Description is required`);
       }
 
-      if (!component.style) {
-        errors.push(
-          `Component ${componentNum}: Please select a capacitor style`
-        );
-      }
+      if (componentType === "capacitor") {
+        if (!component.style) {
+          errors.push(
+            `Component ${componentNum}: Please select a capacitor style`
+          );
+        }
 
-      if (component.capacitance <= 0) {
-        errors.push(
-          `Component ${componentNum}: Capacitance must be greater than 0`
-        );
-      }
+        if (component.capacitance <= 0) {
+          errors.push(
+            `Component ${componentNum}: Capacitance must be greater than 0`
+          );
+        }
 
-      if (component.voltage_stress < 0 || component.voltage_stress > 1.5) {
-        errors.push(
-          `Component ${componentNum}: Voltage stress ratio should be between 0 and 1.5`
-        );
+        if (component.voltage_stress < 0 || component.voltage_stress > 1.5) {
+          errors.push(
+            `Component ${componentNum}: Voltage stress ratio should be between 0 and 1.5`
+          );
+        }
+      } else if (componentType === "resistor") {
+        if (!component.style) {
+          errors.push(
+            `Component ${componentNum}: Please select a resistor style`
+          );
+        }
+
+        if (component.watts < 0) {
+          errors.push(
+            `Component ${componentNum}: Power dissipation (Watts) cannot be negative`
+          );
+        }
+
+        if (component.power_stress < 0 || component.power_stress > 1) {
+          errors.push(
+            `Component ${componentNum}: Power stress should be between 0 and 1`
+          );
+        }
+
+        if (component.power_stress > 0.9) {
+          errors.push(
+            `Component ${componentNum}: Power stress (${(
+              component.power_stress * 100
+            ).toFixed(1)}%) exceeds 90% - high stress condition`
+          );
+        }
+      } else if (componentType === "inductor") {
+        if (!component.inductor_type) {
+          errors.push(
+            `Component ${componentNum}: Please select an inductor type`
+          );
+        }
       }
 
       if (!component.quality_level) {
@@ -995,115 +1316,196 @@ class EnhancedReliabilityCalculator {
     if (!container) return;
 
     const summaryHtml = `
-      <div class="results-summary">
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-value">${results.total_lambda_p}</div>
-            <div class="summary-label">Total λP (failures/10⁶ hrs)</div>
-          </div>
-          
-          <div class="summary-item">
-            <div class="summary-value">${results.components.length}</div>
-            <div class="summary-label">Components Analyzed</div>
-          </div>
-          
-          <div class="summary-item">
-            <div class="summary-value">${this.globalParameters.temperature}°C</div>
-            <div class="summary-label">Operating Temperature</div>
-          </div>
-          
-          <div class="summary-item">
-            <div class="summary-value">${this.globalParameters.environment}</div>
-            <div class="summary-label">Environment</div>
-          </div>
+    <div class="results-summary">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-value">${results.total_lambda_p}</div>
+          <div class="summary-label">Total λP (failures/10⁶ hrs)</div>
+        </div>
+        
+        <div class="summary-item">
+          <div class="summary-value">${results.components.length}</div>
+          <div class="summary-label">Components Analyzed</div>
+        </div>
+        
+        <div class="summary-item">
+          <div class="summary-value">${this.globalParameters.temperature}°C</div>
+          <div class="summary-label">Operating Temperature</div>
+        </div>
+        
+        <div class="summary-item">
+          <div class="summary-value">${this.globalParameters.environment}</div>
+          <div class="summary-label">Environment</div>
         </div>
       </div>
-    `;
+    </div>
+  `;
+
+    // Generate table header dynamically based on component types
+    const hasCapacitors = results.components.some(
+      (c) => c.component_type === "capacitor" || !c.component_type
+    );
+    const hasResistors = results.components.some(
+      (c) => c.component_type === "resistor"
+    );
+    const hasInductors = results.components.some(
+      (c) => c.component_type === "inductor"
+    );
+    let tableHeaders =
+      "<th>Component</th><th>Type</th><th>Style</th><th>λb</th><th>πT</th>";
+
+    if (hasCapacitors) {
+      tableHeaders += "<th>πC</th><th>πV</th>";
+    }
+
+    if (hasResistors) {
+      tableHeaders += "<th>πP</th><th>πS</th>";
+    }
+
+    tableHeaders += "<th>πQ</th><th>πE</th>";
+
+    if (hasCapacitors) {
+      tableHeaders += "<th>πSR</th>";
+    }
+
+    tableHeaders += "<th>λP</th>";
 
     const tableHtml = `
+    <div class="results-table">
+      <table>
+        <thead>
+          <tr>${tableHeaders}</tr>
+        </thead>
+        <tbody>
+          ${results.components
+            .map((comp) => {
+              const componentType = comp.component_type || "capacitor";
+              const typeIcon =
+                componentType === "inductor"
+                  ? "🔗"
+                  : componentType === "resistor"
+                  ? "⚡"
+                  : "🔋";
+              let row = `
+              <tr>
+                <td><strong>${comp.name}</strong></td>
+                <td>${typeIcon} ${
+                componentType.charAt(0).toUpperCase() + componentType.slice(1)
+              }</td>
+                
+                <td>${comp.style}</td>
+                <td>${comp.lambda_b}</td>
+                <td>${comp.pi_t}</td>
+            `;
+              if (componentType === "capacitor") {
+                row += `
+                <td>${comp.pi_c || "-"}</td>
+                <td>${comp.pi_v || "-"}</td>
+              `;
+              } else if (hasCapacitors) {
+                row += "<td>-</td><td>-</td>";
+              }
+
+              if (componentType === "resistor") {
+                row += `
+                <td>${comp.pi_p || "-"}</td>
+                <td>${comp.pi_s || "-"}</td>
+              `;
+              } else if (hasResistors) {
+                row += "<td>-</td><td>-</td>";
+              }
+
+              row += `
+              <td>${comp.pi_q}</td>
+              <td>${comp.pi_e}</td>
+            `;
+
+              if (hasCapacitors) {
+                if (componentType === "capacitor") {
+                  row += `<td>${comp.pi_sr || "1.0"}</td>`;
+                } else {
+                  row += "<td>-</td>";
+                }
+              }
+
+              row += `
+              <td><strong>${comp.lambda_p}</strong></td>
+              </tr>
+            `;
+
+              return row;
+            })
+            .join("")}
+          <tr style="border-top: 2px solid var(--primary-color); background: rgba(37, 99, 235, 0.1);">
+            <td colspan="${
+              hasCapacitors && hasResistors
+                ? 12
+                : hasCapacitors
+                ? 10
+                : hasResistors
+                ? 9
+                : 8
+            }">
+              <strong>TOTAL SYSTEM</strong>
+            </td>
+            <td><strong>${results.total_lambda_p}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+    const parametersHtml = `
+    <div class="parameters-section" style="margin-top: 2rem;">
+      <h3 style="margin-bottom: 1rem; color: var(--primary-color);">
+        <i class="fas fa-cogs"></i> Component Details
+      </h3>
       <div class="results-table">
         <table>
           <thead>
             <tr>
               <th>Component</th>
+              <th>Type</th>
               <th>Description</th>
-              <th>Style</th>
-              <th>λb</th>
-              <th>πT</th>
-              <th>πC</th>
-              <th>πV</th>
-              <th>πQ</th>
-              <th>πE</th>
-              <th>πSR</th>
-              <th>λP</th>
+              <th>Manufacturer</th>
+              <th>Part Number</th>
+              <th>Parameters</th>
             </tr>
           </thead>
           <tbody>
             ${results.components
-              .map(
-                (comp) => `
-              <tr>
-                <td><strong>${comp.name}</strong></td>
-                <td>${comp.parameters.description || ""}</td>
-                <td>${comp.style}</td>
-                <td>${comp.lambda_b}</td>
-                <td>${comp.pi_t}</td>
-                <td>${comp.pi_c}</td>
-                <td>${comp.pi_v}</td>
-                <td>${comp.pi_q}</td>
-                <td>${comp.pi_e}</td>
-                <td>${comp.pi_sr}</td>
-                <td><strong>${comp.lambda_p}</strong></td>
-              </tr>
-            `
-              )
+              .map((comp) => {
+                const componentType = comp.component_type || "capacitor";
+                let paramDetails = "";
+
+                if (componentType === "capacitor") {
+                  paramDetails = `Cap: ${comp.parameters?.capacitance} μF, V.Stress: ${comp.parameters?.voltage_stress}`;
+                } else if (componentType === "resistor") {
+                  paramDetails = `Watts: ${comp.parameters?.watts}W, Power Stress: ${comp.parameters?.power_stress}`;
+                } else if (componentType === "inductor") {
+                  paramDetails = `Type: ${comp.style}, Quality: ${comp.parameters?.quality_level}`;
+                }
+
+                return `
+                <tr>
+                  <td><strong>${comp.name}</strong></td>
+                  <td>${
+                    componentType.charAt(0).toUpperCase() +
+                    componentType.slice(1)
+                  }</td>
+                  <td>${comp.parameters?.description || "N/A"}</td>
+                  <td>${comp.parameters?.manufacturer || "N/A"}</td>
+                  <td>${comp.parameters?.part_number || "N/A"}</td>
+                  <td>${paramDetails}</td>
+                </tr>
+              `;
+              })
               .join("")}
-            <tr style="border-top: 2px solid var(--primary-color); background: rgba(37, 99, 235, 0.1);">
-              <td colspan="10"><strong>TOTAL SYSTEM</strong></td>
-              <td><strong>${results.total_lambda_p}</strong></td>
-            </tr>
           </tbody>
         </table>
       </div>
-    `;
-
-    const parametersHtml = `
-      <div class="parameters-section" style="margin-top: 2rem;">
-        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">
-          <i class="fas fa-cogs"></i> Component Details
-        </h3>
-        <div class="results-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Component</th>
-                <th>Manufacturer</th>
-                <th>Part Number</th>
-                <th>Capacitance</th>
-                <th>Voltage Stress</th>
-                <th>Quality</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${results.components
-                .map(
-                  (comp) => `
-                <tr>
-                  <td><strong>${comp.name}</strong></td>
-                  <td>${comp.parameters.manufacturer || "N/A"}</td>
-                  <td>${comp.parameters.part_number || "N/A"}</td>
-                  <td>${comp.parameters.capacitance} μF</td>
-                  <td>${comp.parameters.voltage_stress}</td>
-                  <td>${comp.parameters.quality_level}</td>
-                </tr>
-              `
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
+    </div>
+  `;
 
     container.innerHTML = summaryHtml + tableHtml + parametersHtml;
     container.style.display = "block";
@@ -1118,7 +1520,6 @@ class EnhancedReliabilityCalculator {
       container.style.transform = "translateY(0)";
     });
 
-    // Scroll to results
     setTimeout(() => {
       container.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 600);

@@ -346,7 +346,7 @@ def get_exact_or_calculate_factor(value, data_points, value_column, factor_colum
     
     # First, check if exact value exists in table
     for row in data_points:
-        if abs(row[value_column] - value) < 1e-10:  # Exact match
+        if abs(row[value_column] - value) < 1e-10:
             return row[factor_column]
     
     # If not found in table, use appropriate calculation
@@ -355,7 +355,6 @@ def get_exact_or_calculate_factor(value, data_points, value_column, factor_colum
     elif calculation_type == 'capacitance':
         return calculate_capacitance_factor(value, column_number)
     elif calculation_type == 'voltage_stress':
-        # Voltage stress calculation based on column
         if column_number == 1:
             return (value / 0.6) ** 5 + 1 
         elif column_number == 2:
@@ -368,9 +367,16 @@ def get_exact_or_calculate_factor(value, data_points, value_column, factor_colum
             return (value / 0.5) ** 3 + 1 
         else:
             return 1.0
+    elif calculation_type == 'resistor_temperature':
+        return calculate_resistor_temperature_factor(value, column_number)
+    elif calculation_type == 'resistor_power':
+        return calculate_resistor_power_factor(value)
+    elif calculation_type == 'resistor_stress':
+        return calculate_resistor_stress_factor(value, column_number)
+    elif calculation_type == 'inductor_temperature':
+        return calculate_inductor_temperature_factor(value)
     else:
         return 1.0
-
 # Routes
 @app.route('/')
 def index():
@@ -431,6 +437,103 @@ def get_environments():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/resistor-styles')
+def get_resistor_styles():
+    """Get all resistor styles"""
+    try:
+        conn = get_db_connection()
+        styles = conn.execute('''
+            SELECT style, spec_number, description, lambda_b, 
+                   pi_t_column, pi_s_column
+            FROM resistor_styles 
+            ORDER BY style
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in styles])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/resistor-quality-levels')
+def get_resistor_quality_levels():
+    """Get resistor quality levels"""
+    try:
+        conn = get_db_connection()
+        qualities = conn.execute('''
+            SELECT quality_level, pi_q 
+            FROM resistor_quality_factors 
+            ORDER BY pi_q
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in qualities])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/resistor-environments')
+def get_resistor_environments():
+    """Get resistor environment types"""
+    try:
+        conn = get_db_connection()
+        environments = conn.execute('''
+            SELECT environment, pi_e 
+            FROM resistor_environment_factors 
+            ORDER BY environment
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in environments])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inductor-styles')
+def get_inductor_styles():
+    """Get all inductor styles"""
+    try:
+        conn = get_db_connection()
+        styles = conn.execute('''
+            SELECT inductor_type, lambda_b, pi_t_column
+            FROM inductor_styles 
+            ORDER BY inductor_type
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in styles])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inductor-quality-levels')
+def get_inductor_quality_levels():
+    """Get inductor quality levels"""
+    try:
+        conn = get_db_connection()
+        qualities = conn.execute('''
+            SELECT quality_level, pi_q 
+            FROM inductor_quality_factors 
+            ORDER BY pi_q
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in qualities])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inductor-environments')
+def get_inductor_environments():
+    """Get inductor environment types"""
+    try:
+        conn = get_db_connection()
+        environments = conn.execute('''
+            SELECT environment, pi_e 
+            FROM inductor_environment_factors 
+            ORDER BY environment
+        ''').fetchall()
+        conn.close()
+        
+        return jsonify([dict(row) for row in environments])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/calculate', methods=['POST'])
 def calculate_reliability():
     """Calculate reliability for components"""
@@ -447,12 +550,18 @@ def calculate_reliability():
         conn = get_db_connection()
         
         for component in components:
-            result = calculate_component_reliability(conn, component)
+            # Determine component type
+            component_type = component.get('component_type', 'capacitor')
+            
+            if component_type == 'resistor':
+                result = calculate_resistor_reliability(conn, component)
+            elif component_type == 'inductor':
+                result = calculate_inductor_reliability(conn, component)
+            else:
+                result = calculate_component_reliability(conn, component)
+            
             results.append(result)
             total_lambda_p += result['lambda_p']
-        
-        # Log calculation for history (optional)
-        log_calculation_for_history(conn, components, results)
         
         conn.close()
         
@@ -465,6 +574,240 @@ def calculate_reliability():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def calculate_resistor_temperature_factor(temperature, column):
+    """Calculate resistor temperature factor using MIL-HDBK-217F equation"""
+    if column == 1:
+        ea = 0.2  # Column 1
+    else:
+        ea = 0.08  # Column 2
+    
+    temp_kelvin = temperature + 273
+    factor = math.exp(-ea / Config.BOLTZMANN_CONSTANT * 
+                     (1/temp_kelvin - 1/Config.REFERENCE_TEMP))
+    return round(factor, 6)
+
+def calculate_resistor_power_factor(power_dissipation):
+    """Calculate resistor power factor using equation"""
+    if power_dissipation <= 0:
+        return 0.068
+    
+    # π_P = (Power Dissipation)^0.39
+    factor = power_dissipation ** 0.39
+    return round(factor, 7)
+
+def calculate_resistor_stress_factor(power_stress, column):
+    """Calculate resistor power stress factor"""
+    if power_stress <= 0:
+        return 0.66 if column == 2 else 0.79
+    
+    if column == 1:
+        # Column 1: π_S = .71e^1.1(S)
+        factor = 0.71 * math.exp(1.1 * power_stress)
+    else:
+        # Column 2: π_S = .54e^2.04(S)
+        factor = 0.54 * math.exp(2.04 * power_stress)
+    
+    return round(factor, 6)
+
+def calculate_inductor_temperature_factor(temperature):
+    """Calculate inductor temperature factor using MIL-HDBK-217F equation"""
+    # π_T = exp(-11 / (8.617 x 10^-5) * (1/(T+273) - 1/298))
+    temp_kelvin = temperature + 273
+    factor = math.exp(-11 / (8.617e-5) * (1/temp_kelvin - 1/298))
+    return round(factor, 6)
+
+def calculate_inductor_reliability(conn, component):
+    """Calculate reliability for a single inductor component"""
+    try:
+        # Get component parameters
+        project_name = component.get('project_name')
+        inductor_type = component.get('inductor_type')
+        temperature = float(component.get('temperature', Config.DEFAULT_TEMPERATURE))
+        quality_level = component.get('quality_level', 'MIL-SPEC')
+        environment = component.get('environment', Config.DEFAULT_ENVIRONMENT)
+        
+        # Enhanced component parameters
+        component_name = component.get('name', 'Inductor_Component')
+        description = component.get('description', '')
+        manufacturer = component.get('manufacturer', '')
+        part_number = component.get('part_number', '')
+        
+        # Get inductor style data
+        style_data = conn.execute('''
+            SELECT * FROM inductor_styles WHERE inductor_type = ?
+        ''', (inductor_type,)).fetchone()
+        
+        if not style_data:
+            raise ValueError(f"Inductor type '{inductor_type}' not found")
+        
+        lambda_b = style_data['lambda_b']
+        
+        # Calculate π_T (Temperature Factor)
+        temp_data = conn.execute('''
+            SELECT temperature, pi_t 
+            FROM inductor_temperature_factors 
+            ORDER BY temperature
+        ''').fetchall()
+
+        pi_t = get_exact_or_calculate_factor(temperature, temp_data, 'temperature', 'pi_t', 'inductor_temperature', None)
+        
+        # Get π_Q (Quality Factor)
+        quality_data = conn.execute('''
+            SELECT pi_q FROM inductor_quality_factors WHERE quality_level = ?
+        ''', (quality_level,)).fetchone()
+        
+        if quality_data:
+            pi_q = quality_data['pi_q']
+        else:
+            pi_q = 1.0
+        
+        # Get π_E (Environment Factor)
+        env_data = conn.execute('''
+            SELECT pi_e FROM inductor_environment_factors WHERE environment = ?
+        ''', (environment,)).fetchone()
+        
+        if env_data:
+            pi_e = env_data['pi_e']
+        else:
+            pi_e = 1.0
+        
+        # Calculate λ_P: λ_P = λ_b × π_T × π_Q × π_E
+        lambda_p = lambda_b * pi_t * pi_q * pi_e
+        
+        return {
+            'project_name': project_name,
+            'name': component_name,
+            'component_type': 'inductor',
+            'style': inductor_type,
+            'lambda_b': round(lambda_b, 8),
+            'pi_t': round(pi_t, 6),
+            'pi_q': round(pi_q, 6),
+            'pi_e': round(pi_e, 6),
+            'lambda_p': round(lambda_p, 10),
+            'parameters': {
+                'description': description,
+                'manufacturer': manufacturer,
+                'part_number': part_number,
+                'temperature': temperature,
+                'quality_level': quality_level,
+                'environment': environment
+            }
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error calculating inductor {component.get('name', 'Unknown')}: {str(e)}")
+
+def calculate_resistor_reliability(conn, component):
+    """Calculate reliability for a single resistor component"""
+    try:
+        # Get component parameters
+        project_name = component.get('project_name')
+        style = component.get('style')
+        temperature = float(component.get('temperature', Config.DEFAULT_TEMPERATURE))
+        watts = float(component.get('watts', 0.125))  # Power dissipation in Watts
+        power_stress = float(component.get('power_stress', 0.5))  # S value
+        quality_level = component.get('quality_level', Config.DEFAULT_QUALITY)
+        environment = component.get('environment', Config.DEFAULT_ENVIRONMENT)
+        
+        # Enhanced component parameters
+        component_name = component.get('name', f'{style}_Component')
+        description = component.get('description', '')
+        manufacturer = component.get('manufacturer', '')
+        part_number = component.get('part_number', '')
+        
+        # Get resistor style data
+        style_data = conn.execute('''
+            SELECT * FROM resistor_styles WHERE style = ?
+        ''', (style,)).fetchone()
+        
+        if not style_data:
+            raise ValueError(f"Resistor style '{style}' not found")
+        
+        lambda_b = style_data['lambda_b']
+        pi_t_column = style_data['pi_t_column']
+        pi_s_column = style_data['pi_s_column']
+        
+        # Calculate π_T (Temperature Factor)
+        temp_data = conn.execute('''
+            SELECT temperature, column_1, column_2 
+            FROM resistor_temperature_factors 
+            ORDER BY temperature
+        ''').fetchall()
+
+        if pi_t_column == 1:
+            pi_t = get_exact_or_calculate_factor(temperature, temp_data, 'temperature', 'column_1', 'resistor_temperature', pi_t_column)
+        else:
+            pi_t = get_exact_or_calculate_factor(temperature, temp_data, 'temperature', 'column_2', 'resistor_temperature', pi_t_column)
+        
+        # Calculate π_P (Power Factor) using Watts
+        power_data = conn.execute('''
+            SELECT power_dissipation, pi_p 
+            FROM resistor_power_factors 
+            ORDER BY power_dissipation
+        ''').fetchall()
+        
+        pi_p = get_exact_or_calculate_factor(watts, power_data, 'power_dissipation', 'pi_p', 'resistor_power', None)
+        
+        # Calculate π_S (Power Stress Factor) using S
+        stress_data = conn.execute('''
+            SELECT power_stress, column_1, column_2
+            FROM resistor_stress_factors 
+            ORDER BY power_stress
+        ''').fetchall()
+
+        column_name = f'column_{pi_s_column}'
+        pi_s = get_exact_or_calculate_factor(power_stress, stress_data, 'power_stress', column_name, 'resistor_stress', pi_s_column)
+        
+        # Get π_Q (Quality Factor)
+        quality_data = conn.execute('''
+            SELECT pi_q FROM resistor_quality_factors WHERE quality_level = ?
+        ''', (quality_level,)).fetchone()
+        
+        if quality_data:
+            pi_q = quality_data['pi_q']
+        else:
+            pi_q = 3.0
+        
+        # Get π_E (Environment Factor)
+        env_data = conn.execute('''
+            SELECT pi_e FROM resistor_environment_factors WHERE environment = ?
+        ''', (environment,)).fetchone()
+        
+        if env_data:
+            pi_e = env_data['pi_e']
+        else:
+            pi_e = 1.0
+        
+        # Calculate λ_P: λ_P = λ_b × π_T × π_P × π_S × π_Q × π_E
+        lambda_p = lambda_b * pi_t * pi_p * pi_s * pi_q * pi_e
+        
+        return {
+            'project_name': project_name,
+            'name': component_name,
+            'component_type': 'resistor',
+            'style': style,
+            'lambda_b': round(lambda_b, 8),
+            'pi_t': round(pi_t, 6),
+            'pi_p': round(pi_p, 7),
+            'pi_s': round(pi_s, 6),
+            'pi_q': round(pi_q, 6),
+            'pi_e': round(pi_e, 6),
+            'lambda_p': round(lambda_p, 10),
+            'parameters': {
+                'description': description,
+                'manufacturer': manufacturer,
+                'part_number': part_number,
+                'temperature': temperature,
+                'watts': watts,
+                'power_stress': power_stress,
+                'quality_level': quality_level,
+                'environment': environment
+            }
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error calculating resistor {component.get('name', 'Unknown')}: {str(e)}")
 
 def calculate_component_reliability(conn, component):
     """Calculate reliability for a single component with enhanced parameters"""
