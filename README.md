@@ -34,21 +34,27 @@ reliability/
 │
 ├── src/ # Source code
 │ ├── app.py # Flask backend API
-│ ├── config.py # Flask backend API
-│ ├── requirements.txt # module python
-│ ├── database/init_db.py # database
-│ ├── static/  # Icons, Images, CSS, JS files
-│   ├── assets/ # Images files.
-│   ├── css/ styles.css #  CSS.
-│   └── js/ app.js #  JS files.
-│ ├── templates/
-│   ├── index.html   
-│   └── splash.html  
+│ ├── config.py # Flask configuration file
+│ ├── requirements.txt # Python dependencies
+│ │
+│ ├── database/
+│ │ └── init_db.py # Database initialization script
+│ │
+│ ├── static/ # Frontend assets
+│ │ ├── assets/ # Image files
+│ │ ├── css/
+│ │ │ └── styles.css # CSS styles
+│ │ └── js/
+│ │ └── app.js # JavaScript frontend logic
+│ │
+│ ├── templates/ # HTML templates for Flask
+│ │ ├── index.html
+│ │ └── splash.html
 │
 ├── main.js # Electron main process
-├── package.json # Electron project config
-├── Developer_guide.md # Developer guide
-├── .gitignore # Ignore build files
+├── package.json # Electron project configuration
+├── Developer_guide.md # Developer documentation
+├── .gitignore # Ignore unnecessary build files
 └── README.md # Project documentation
 
 ## 🧱 Build Instructions
