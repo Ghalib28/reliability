@@ -76,14 +76,17 @@ reliability/
 git clone https://github.com/Ghalib28/reliability.git
 cd reliability
 
-# 2. Install database if file mil_hdbk_217.db it doesn't exist, cd src\database 
+# 2. Install database if file mil_hdbk_217.db it doesn't exist,
+cd src\database 
 python init_db.py
 
 cd .., cd ..
-# 3. Install backend dependencies, cd src 
+# 3. Install backend dependencies,
+cd src 
 pip install -r requirements.txt
 
-# 4. Install Electron dependencies, cd..
+# 4. Install Electron dependencies,
+cd..
 npm install
 
 # 6. Run Electron desktop app
