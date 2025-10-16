@@ -31,8 +31,33 @@ This app currently supports calculation for **Capacitors**, **Resistors**, and *
 ---
 
 ## 📂 Project Structure
-<img width="222" height="636" alt="image" src="https://github.com/user-attachments/assets/585e9bf4-a4a8-4d7b-9b34-89936d951149" />
-
+reliability/
+│
+├── src/                          # Source code utama
+│   ├── app.py                    # Flask backend API utama
+│   ├── config.py                 # Konfigurasi Flask
+│   ├── requirements.txt          # Daftar modul Python
+│   │
+│   ├── database/
+│   │   └── init_db.py            # Inisialisasi database SQLite
+│   │
+│   ├── static/                   # File statis (icons, images, CSS, JS)
+│   │   ├── assets/               # Folder khusus untuk file gambar
+│   │   ├── css/
+│   │   │   └── styles.css        # File CSS utama
+│   │   └── js/
+│   │       └── app.js            # File JavaScript utama
+│   │
+│   ├── templates/                # Template HTML Flask
+│   │   ├── index.html
+│   │   └── splash.html
+│   │
+│   └── main.js                   # Proses utama Electron
+│
+├── package.json                  # Konfigurasi proyek Electron
+├── Developer_guide.md            # Panduan untuk pengembang
+├── .gitignore                    # File/folder yang diabaikan Git
+└── README.md                     # Dokumentasi proyek
 
 
 ## 🧱 Build Instructions
