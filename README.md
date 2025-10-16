@@ -28,9 +28,8 @@ This app currently supports calculation for **Capacitors**, **Resistors**, and *
 | Output Format | Excel (.xlsx) |
 | Build Target | Windows Executable (.exe) or Another OS|
 
----
-
-## 📂 Project Structure
+## 📁 Project Structure
+```text
 reliability/
 │
 ├── src/                          # Source code utama
@@ -58,7 +57,7 @@ reliability/
 ├── Developer_guide.md            # Panduan untuk pengembang
 ├── .gitignore                    # File/folder yang diabaikan Git
 └── README.md                     # Dokumentasi proyek
-
+```
 
 ## 🧱 Build Instructions
 
