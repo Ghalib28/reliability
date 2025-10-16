@@ -8,7 +8,7 @@ This app currently supports calculation for **Capacitors**, **Resistors**, and *
 
 ## 🚀 Features
 
-- 🔹 **Component Reliability Calculation** using MIL-HDBK-217F formula
+- 🔹 **Component Reliability Calculation** using MIL-HDBK-217F
 - 🔹 Supports **Capacitor**, **Resistor**, and **Inductor**
 - 🔹 Interactive **Frontend (HTML, CSS, JavaScript)**
 - 🔹 **Backend Flask (Python)** for computation logic
