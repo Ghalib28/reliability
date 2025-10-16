@@ -2,8 +2,8 @@
 
 A cross-platform desktop application for **reliability prediction** of electronic components based on **MIL-HDBK-217F** standard.  
 This app currently supports calculation for **Capacitors**, **Resistors**, and **Inductors**, and allows export/import of project data in Excel format.
-[![Download EXE](https://img.shields.io/badge/Download-.exe-blue?style=for-the-badge&logo=windows)](https://github.com/Ghalib28/reliability/releases/download/v1.1.0/Reliability.Lambda.Predict.Setup.1.1.0.exe)
 
+[![Download EXE](https://img.shields.io/badge/Download-.exe-blue?style=for-the-badge&logo=windows)](https://github.com/Ghalib28/reliability/releases/download/v1.1.0/Reliability.Lambda.Predict.Setup.1.1.0.exe)
 ---
 
 ## 🚀 Features
