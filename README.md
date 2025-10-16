@@ -86,7 +86,7 @@ cd src
 pip install -r requirements.txt
 
 # 4. Install Electron dependencies,
-cd..
+cd ..
 npm install
 
 # 6. Run Electron desktop app
