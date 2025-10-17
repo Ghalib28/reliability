@@ -1075,9 +1075,68 @@ class EnhancedReliabilityCalculator {
       setTimeout(() => {
         component.remove();
         this.collapsedComponents.delete(componentId);
+
+        // PERBAIKAN: Recalculate counters setelah hapus
+        this.recalculateComponentCounters();
+
         this.updateCalculateButton();
       }, 300);
     }
+  }
+
+  recalculateComponentCounters() {
+    // Reset all counters
+    this.componentCounters = {
+      capacitor: 0,
+      resistor: 0,
+      inductor: 0,
+    };
+
+    // Count existing components by type
+    const componentForms = document.querySelectorAll(".component-form");
+    const countersByType = {
+      capacitor: 0,
+      resistor: 0,
+      inductor: 0,
+    };
+
+    componentForms.forEach((form) => {
+      const componentType = form.dataset.componentType;
+      if (componentType) {
+        countersByType[componentType]++;
+      }
+    });
+
+    // Update counters to match actual count
+    this.componentCounters = { ...countersByType };
+
+    // Renumber all components
+    const typeCounters = {
+      capacitor: 0,
+      resistor: 0,
+      inductor: 0,
+    };
+
+    componentForms.forEach((form) => {
+      const componentType = form.dataset.componentType;
+      if (componentType) {
+        typeCounters[componentType]++;
+        const newNumber = typeCounters[componentType];
+
+        // Update component title
+        const title = form.querySelector(".component-title");
+        if (title) {
+          const iconHtml = title.querySelector("i")
+            ? title.querySelector("i").outerHTML
+            : "";
+          const typeName =
+            componentType.charAt(0).toUpperCase() + componentType.slice(1);
+          title.innerHTML = `${iconHtml} ${typeName} ${newNumber}`;
+        }
+      }
+    });
+
+    console.log("Component counters recalculated:", this.componentCounters);
   }
 
   updateCalculateButton() {
@@ -1241,6 +1300,8 @@ class EnhancedReliabilityCalculator {
           inductorTypeSelect.value = comp.inductor_type || "";
       }
     });
+    // PERBAIKAN: Recalculate setelah restore
+    this.recalculateComponentCounters();
   }
 
   // Calculation
