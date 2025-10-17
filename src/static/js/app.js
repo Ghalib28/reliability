@@ -255,6 +255,11 @@ class EnhancedReliabilityCalculator {
     if (workspaceScreen) workspaceScreen.style.display = "block";
     this.updateHeaderButtons("workspace");
 
+    // Clear workspace if no current project
+    if (!this.currentProject) {
+      this.clearWorkspace();
+    }
+
     // Initialize workspace
     this.populateEnvironmentSelect();
     this.selectComponentType("capacitor"); // Auto-select capacitor
@@ -276,7 +281,17 @@ class EnhancedReliabilityCalculator {
     this.resetProject();
     this.showProjectSetupScreen();
     const projectNameInput = document.getElementById("projectName");
-    if (projectNameInput) projectNameInput.focus();
+    const projectDescInput = document.getElementById("projectdescription");
+    if (projectNameInput) {
+      projectNameInput.value = "";
+      projectNameInput.focus();
+    }
+
+    if (projectDescInput) {
+      projectDescInput.value = "";
+    }
+
+    console.log("New project creation initiated");
   }
 
   setupProject() {
@@ -294,6 +309,8 @@ class EnhancedReliabilityCalculator {
       this.showError("Project name is required");
       return;
     }
+
+    this.resetProject();
 
     // Create project object
     this.currentProject = {
@@ -398,6 +415,77 @@ class EnhancedReliabilityCalculator {
     this.globalParameters = { temperature: 25, environment: "GB" };
     this.currentResults = null;
     this.collapsedComponents.clear();
+
+    // Reset component counters
+    this.componentCounters = {
+      capacitor: 0,
+      resistor: 0,
+      inductor: 0,
+    };
+
+    // Clear components container
+    const container = document.getElementById("componentsContainer");
+    if (container) {
+      container.innerHTML = "";
+    }
+
+    // Hide results
+    this.hideResults();
+
+    // Reset global parameters UI
+    const temperatureInput = document.getElementById("globalTemperature");
+    const environmentSelect = document.getElementById("globalEnvironment");
+
+    if (temperatureInput) {
+      temperatureInput.value = 25;
+    }
+
+    if (environmentSelect) {
+      environmentSelect.value = "";
+    }
+
+    // Clear project info display
+    const projectInfoDisplay = document.getElementById("projectInfoDisplay");
+    if (projectInfoDisplay) {
+      projectInfoDisplay.innerHTML = "";
+    }
+
+    // Reset project setup form
+    const projectSetupForm = document.getElementById("projectSetupForm");
+    if (projectSetupForm) {
+      projectSetupForm.reset();
+    }
+
+    console.log("Project reset complete");
+  }
+
+  clearWorkspace() {
+    // Clear components container
+    const container = document.getElementById("componentsContainer");
+    if (container) {
+      container.innerHTML = "";
+    }
+
+    // Hide results
+    this.hideResults();
+
+    // Reset calculate button
+    this.updateCalculateButton();
+
+    // Reset global parameters display
+    const temperatureInput = document.getElementById("globalTemperature");
+    const environmentSelect = document.getElementById("globalEnvironment");
+
+    if (temperatureInput) {
+      temperatureInput.value = 25;
+    }
+
+    if (environmentSelect && this.environments.length > 0) {
+      this.populateEnvironmentSelect();
+      environmentSelect.value = "GB";
+    }
+
+    console.log("Workspace cleared");
   }
 
   showOpenProjectDialog() {
@@ -469,29 +557,9 @@ class EnhancedReliabilityCalculator {
     event.target.value = "";
   }
 
-  showCSVImportComingSoon() {
-    const comingSoonMessage = document.getElementById("comingSoonMessage");
-    if (comingSoonMessage) {
-      comingSoonMessage.innerHTML = `
-      <div class="coming-soon-icon">
-        <i class="fas fa-file-csv"></i>
-      </div>
-      <h3>CSV Import</h3>
-      <p>CSV import functionality is currently under development and will be available in a future update.</p>
-      <p>Please use JSON files for importing projects!</p>
-    `;
-    }
-    this.showModal("comingSoonModal");
-  }
-
   handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.name.endsWith(".csv")) {
-      this.showCSVImportComingSoon();
-      event.target.value = ""; // Reset file input
-      return;
-    }
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -500,9 +568,7 @@ class EnhancedReliabilityCalculator {
         if (file.name.endsWith(".json")) {
           projectData = JSON.parse(e.target.result);
         } else {
-          throw new Error(
-            "Unsupported file format. Please use JSON or CSV files."
-          );
+          throw new Error("Unsupported file format. Please use JSON files.");
         }
 
         this.importProject(projectData);
@@ -517,6 +583,9 @@ class EnhancedReliabilityCalculator {
   }
 
   async importProject(projectData) {
+    //Reset current project first
+    this.resetProject();
+
     this.currentProject = {
       ...projectData,
       id: projectData.id || this.generateProjectId(),
@@ -1438,13 +1507,11 @@ class EnhancedReliabilityCalculator {
             .join("")}
           <tr style="border-top: 2px solid var(--primary-color); background: rgba(37, 99, 235, 0.1);">
             <td colspan="${
-              hasCapacitors && hasResistors
-                ? 12
-                : hasCapacitors
-                ? 10
-                : hasResistors
-                ? 9
-                : 8
+              5 + // Base: Component, Type, Style, λb, πT
+              (hasCapacitors ? 2 : 0) + // πC, πV
+              (hasResistors ? 2 : 0) + // πP, πS
+              2 + // πQ, πE (common)
+              (hasCapacitors ? 1 : 0) // πSR
             }">
               <strong>TOTAL SYSTEM</strong>
             </td>
@@ -1465,7 +1532,6 @@ class EnhancedReliabilityCalculator {
           <thead>
             <tr>
               <th>Component</th>
-              <th>Type</th>
               <th>Description</th>
               <th>Manufacturer</th>
               <th>Part Number</th>
@@ -1479,20 +1545,16 @@ class EnhancedReliabilityCalculator {
                 let paramDetails = "";
 
                 if (componentType === "capacitor") {
-                  paramDetails = `Cap: ${comp.parameters?.capacitance} μF, V.Stress: ${comp.parameters?.voltage_stress}`;
+                  paramDetails = `Cap: ${comp.parameters?.capacitance} μF, Voltage Stress: ${comp.parameters?.voltage_stress}, Circuit Resistance: ${comp.parameters?.series_resistance}, Quality: ${comp.parameters?.quality_level}`;
                 } else if (componentType === "resistor") {
-                  paramDetails = `Watts: ${comp.parameters?.watts}W, Power Stress: ${comp.parameters?.power_stress}`;
+                  paramDetails = `Watts: ${comp.parameters?.watts}W, Power Stress: ${comp.parameters?.power_stress}, Quality: ${comp.parameters?.quality_level}`;
                 } else if (componentType === "inductor") {
-                  paramDetails = `Type: ${comp.style}, Quality: ${comp.parameters?.quality_level}`;
+                  paramDetails = `Quality: ${comp.parameters?.quality_level}`;
                 }
 
                 return `
                 <tr>
                   <td><strong>${comp.name}</strong></td>
-                  <td>${
-                    componentType.charAt(0).toUpperCase() +
-                    componentType.slice(1)
-                  }</td>
                   <td>${comp.parameters?.description || "N/A"}</td>
                   <td>${comp.parameters?.manufacturer || "N/A"}</td>
                   <td>${comp.parameters?.part_number || "N/A"}</td>
@@ -1553,20 +1615,6 @@ class EnhancedReliabilityCalculator {
       return;
     }
     this.showModal("exportModal");
-  }
-  showCSVComingSoon() {
-    const comingSoonMessage = document.getElementById("comingSoonMessage");
-    if (comingSoonMessage) {
-      comingSoonMessage.innerHTML = `
-      <div class="coming-soon-icon">
-        <i class="fas fa-file-csv"></i>
-      </div>
-      <h3>CSV Export</h3>
-      <p>CSV export functionality is currently under development and will be available in a future update.</p>
-      <p>Please use JSON export for now!</p>
-    `;
-    }
-    this.showModal("comingSoonModal");
   }
 
   async exportProject(format) {

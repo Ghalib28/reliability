@@ -133,34 +133,6 @@ def create_database_manually(db_path):
         )
         ''')
         
-        # Calculations history table
-        cursor.execute('''
-        CREATE TABLE calculations_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_name TEXT,
-            component_name TEXT,
-            style TEXT,
-            lambda_b REAL,
-            pi_t REAL,
-            pi_c REAL,
-            pi_v REAL,
-            pi_q REAL,
-            pi_e REAL,
-            pi_sr REAL DEFAULT 1.0,
-            lambda_p REAL,
-            temperature REAL,
-            capacitance REAL,
-            voltage_stress REAL,
-            quality_level TEXT,
-            environment TEXT,
-            series_resistance REAL,
-            description TEXT,
-            manufacturer TEXT,
-            part_number TEXT,
-            created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
-        )
-        ''')
-        
         # Insert basic data
         cursor.execute('''
             INSERT OR REPLACE INTO capacitor_styles 
@@ -951,48 +923,6 @@ def calculate_component_reliability(conn, component):
     except Exception as e:
         raise Exception(f"Error calculating component {component.get('name', 'Unknown')}: {str(e)}")
 
-def log_calculation_for_history(conn, components, results):
-    """Log calculation to history for reference (optional)"""
-    try:
-        for i, result in enumerate(results):
-            component = components[i]
-            params = result['parameters']
-            
-            conn.execute('''
-                INSERT INTO calculations_history 
-                (project_name, component_name, style, lambda_b, pi_t, pi_c, pi_v, pi_q, pi_e, pi_sr, lambda_p,
-                 temperature, capacitance, voltage_stress, quality_level, environment, series_resistance,
-                 description, manufacturer, part_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                result['project_name'], result['name'], result['style'], result['lambda_b'], result['pi_t'], 
-                result['pi_c'], result['pi_v'], result['pi_q'], result['pi_e'], 
-                result['pi_sr'], result['lambda_p'], params['temperature'], 
-                params['capacitance'], params['voltage_stress'], params['quality_level'], 
-                params['environment'], params['series_resistance'], params['description'],
-                params['manufacturer'], params['part_number']
-            ))
-        
-        conn.commit()
-    except Exception as e:
-        print(f"Error logging calculation history: {e}")
-
-@app.route('/api/history')
-def get_calculation_history():
-    """Get calculation history"""
-    try:
-        conn = get_db_connection()
-        history = conn.execute('''
-            SELECT * FROM calculations_history 
-            ORDER BY created_at DESC 
-            LIMIT 100
-        ''').fetchall()
-        conn.close()
-        
-        return jsonify([dict(row) for row in history])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/export/<format>')
 def export_data(format):
     """Export calculation results - simplified for project-based approach"""
@@ -1014,83 +944,6 @@ def export_data(format):
     except Exception as e:
         print(f"Export Error: {str(e)}")
         return jsonify({'error': f'Export failed: {str(e)}'}), 500
-
-@app.route('/api/component-types')
-def get_component_types():
-    """Get available component types"""
-    return jsonify([
-        {
-            'type': 'capacitor',
-            'name': 'Capacitors',
-            'description': 'Fixed and Variable Capacitors',
-            'available': True,
-            'icon': 'fas fa-battery-half'
-        },
-        {
-            'type': 'resistor',
-            'name': 'Resistors',
-            'description': 'Fixed and Variable Resistors',
-            'available': False,
-            'icon': 'fas fa-wave-square'
-        },
-        {
-            'type': 'inductor',
-            'name': 'Inductors',
-            'description': 'Fixed and Variable Inductors',
-            'available': False,
-            'icon': 'fas fa-circle'
-        },
-        {
-            'type': 'semiconductor',
-            'name': 'Semiconductors',
-            'description': 'Diodes, Transistors, ICs',
-            'available': False,
-            'icon': 'fas fa-microchip'
-        }
-    ])
-
-@app.route('/api/validate-component', methods=['POST'])
-def validate_component():
-    """Validate component parameters before calculation"""
-    try:
-        data = request.get_json()
-        component = data.get('component', {})
-        
-        errors = []
-        warnings = []
-        
-        # Validation rules
-        if not component.get('description'):
-            errors.append("Description is required")
-        
-        if not component.get('style'):
-            errors.append("Component style must be selected")
-        
-        capacitance = component.get('capacitance')
-        if capacitance is None or float(capacitance) <= 0:
-            errors.append("Capacitance must be greater than 0")
-        
-        voltage_stress = component.get('voltage_stress')
-        if voltage_stress is None:
-            errors.append("Voltage stress ratio is required")
-        else:
-            voltage_stress = float(voltage_stress)
-            if voltage_stress < 0 or voltage_stress > 1.5:
-                errors.append("Voltage stress ratio should be between 0 and 1.5")
-            elif voltage_stress > 1.0:
-                warnings.append("Voltage stress ratio above 1.0 may indicate overstress condition")
-        
-        if not component.get('quality_level'):
-            errors.append("Quality level must be selected")
-        
-        return jsonify({
-            'valid': len(errors) == 0,
-            'errors': errors,
-            'warnings': warnings
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 def create_excel_export(project_data):
     """Create single-sheet Excel export with all information"""
@@ -1160,39 +1013,103 @@ def create_excel_export(project_data):
     ws.cell(row=current_row, column=1, value="COMPONENTS CONFIGURATION")
     ws.cell(row=current_row, column=1).font = subheader_font
     ws.cell(row=current_row, column=1).fill = subheader_fill
-    ws.merge_cells(f'A{current_row}:I{current_row}')
+    ws.merge_cells(f'A{current_row}:L{current_row}')
     current_row += 1
-    
-    comp_headers = ['Component', 'Description', 'Manufacturer', 'Part Number', 
-                    'Style', 'Cap (μF)', 'V.Stress', 'Quality', 'Series R (Ω)']
-    
+
+    components = project_data.get('components', [])
+
+    # Detect component types in configuration
+    comp_has_capacitors = any(c.get('component_type', 'capacitor') == 'capacitor' for c in components)
+    comp_has_resistors = any(c.get('component_type') == 'resistor' for c in components)
+    comp_has_inductors = any(c.get('component_type') == 'inductor' for c in components)
+
+    # Build dynamic headers for components
+    comp_headers = ['Component', 'Type', 'Description', 'Manufacturer', 'Part Number', 'Style/Type']
+
+    if comp_has_capacitors:
+        comp_headers.extend(['Cap (μF)', 'V.Stress', 'Series R (Ω)'])
+
+    if comp_has_resistors:
+        comp_headers.extend(['Watts', 'P.Stress'])
+
+    comp_headers.append('Quality')
+
+    # Write headers
     for col, header in enumerate(comp_headers, start=1):
         cell = ws.cell(row=current_row, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal='center', vertical='center')
         cell.border = border_thin
-    
+
     current_row += 1
-    components = project_data.get('components', [])
-    
+
+    # Write component data rows
     for comp in components:
-        ws.cell(row=current_row, column=1, value=comp.get('name', ''))
-        ws.cell(row=current_row, column=2, value=comp.get('description', ''))
-        ws.cell(row=current_row, column=3, value=comp.get('manufacturer', ''))
-        ws.cell(row=current_row, column=4, value=comp.get('part_number', ''))
-        ws.cell(row=current_row, column=5, value=comp.get('style', ''))
-        ws.cell(row=current_row, column=6, value=comp.get('capacitance', ''))
-        ws.cell(row=current_row, column=7, value=comp.get('voltage_stress', ''))
-        ws.cell(row=current_row, column=8, value=comp.get('quality_level', ''))
-        ws.cell(row=current_row, column=9, value=comp.get('series_resistance', ''))
+        comp_type = comp.get('component_type', 'capacitor')
+        type_icon = '🔋' if comp_type == 'capacitor' else ('⚡' if comp_type == 'resistor' else '🔗')
         
-        for col in range(1, 10):
+        col_idx = 1
+        
+        # Component name
+        ws.cell(row=current_row, column=col_idx, value=comp.get('name', ''))
+        col_idx += 1
+        
+        # Type
+        ws.cell(row=current_row, column=col_idx, value=f"{type_icon} {comp_type.capitalize()}")
+        col_idx += 1
+        
+        # Description
+        ws.cell(row=current_row, column=col_idx, value=comp.get('description', ''))
+        col_idx += 1
+        
+        # Manufacturer
+        ws.cell(row=current_row, column=col_idx, value=comp.get('manufacturer', ''))
+        col_idx += 1
+        
+        # Part Number
+        ws.cell(row=current_row, column=col_idx, value=comp.get('part_number', ''))
+        col_idx += 1
+        
+        # Style/Type column
+        if comp_type == 'inductor':
+            ws.cell(row=current_row, column=col_idx, value=comp.get('inductor_type', ''))
+        else:
+            ws.cell(row=current_row, column=col_idx, value=comp.get('style', ''))
+        col_idx += 1
+        
+        # Capacitor-specific parameters
+        if comp_has_capacitors:
+            if comp_type == 'capacitor':
+                ws.cell(row=current_row, column=col_idx, value=comp.get('capacitance', ''))
+                ws.cell(row=current_row, column=col_idx + 1, value=comp.get('voltage_stress', ''))
+                ws.cell(row=current_row, column=col_idx + 2, value=comp.get('series_resistance', ''))
+            else:
+                ws.cell(row=current_row, column=col_idx, value='-')
+                ws.cell(row=current_row, column=col_idx + 1, value='-')
+                ws.cell(row=current_row, column=col_idx + 2, value='-')
+            col_idx += 3
+        
+        # Resistor-specific parameters
+        if comp_has_resistors:
+            if comp_type == 'resistor':
+                ws.cell(row=current_row, column=col_idx, value=comp.get('watts', ''))
+                ws.cell(row=current_row, column=col_idx + 1, value=comp.get('power_stress', ''))
+            else:
+                ws.cell(row=current_row, column=col_idx, value='-')
+                ws.cell(row=current_row, column=col_idx + 1, value='-')
+            col_idx += 2
+        
+        # Quality (common for all)
+        ws.cell(row=current_row, column=col_idx, value=comp.get('quality_level', ''))
+        
+        # Apply borders and alignment
+        for col in range(1, col_idx + 1):
             ws.cell(row=current_row, column=col).border = border_thin
             ws.cell(row=current_row, column=col).alignment = Alignment(vertical='center')
         
         current_row += 1
-    
+
     current_row += 1
     
     # === SECTION 4: Calculation Results ===
@@ -1200,11 +1117,33 @@ def create_excel_export(project_data):
         ws.cell(row=current_row, column=1, value="CALCULATION RESULTS")
         ws.cell(row=current_row, column=1).font = subheader_font
         ws.cell(row=current_row, column=1).fill = subheader_fill
-        ws.merge_cells(f'A{current_row}:K{current_row}')
+        ws.merge_cells(f'A{current_row}:N{current_row}')
         current_row += 1
         
-        result_headers = ['Component', 'Style', 'λb', 'πT', 'πC', 'πV', 'πQ', 'πE', 'πSR', 'λP']
+        results = project_data['results']['components']
         
+        # Detect component types
+        has_capacitors = any(r.get('component_type') == 'capacitor' or not r.get('component_type') for r in results)
+        has_resistors = any(r.get('component_type') == 'resistor' for r in results)
+        has_inductors = any(r.get('component_type') == 'inductor' for r in results)
+        
+        # Build dynamic headers
+        result_headers = ['Component', 'Type', 'Style', 'λb', 'πT']
+        
+        if has_capacitors:
+            result_headers.extend(['πC', 'πV'])
+        
+        if has_resistors:
+            result_headers.extend(['πP', 'πS'])
+        
+        result_headers.extend(['πQ', 'πE'])
+        
+        if has_capacitors:
+            result_headers.append('πSR')
+        
+        result_headers.append('λP')
+        
+        # Write headers
         for col, header in enumerate(result_headers, start=1):
             cell = ws.cell(row=current_row, column=col, value=header)
             cell.font = header_font
@@ -1213,51 +1152,126 @@ def create_excel_export(project_data):
             cell.border = border_thin
         
         current_row += 1
-        results = project_data['results']['components']
         
+        # Write data rows
         for result in results:
-            ws.cell(row=current_row, column=1, value=result.get('name', ''))
-            ws.cell(row=current_row, column=2, value=result.get('style', ''))
-            ws.cell(row=current_row, column=3, value=result.get('lambda_b', ''))
-            ws.cell(row=current_row, column=4, value=result.get('pi_t', ''))
-            ws.cell(row=current_row, column=5, value=result.get('pi_c', ''))
-            ws.cell(row=current_row, column=6, value=result.get('pi_v', ''))
-            ws.cell(row=current_row, column=7, value=result.get('pi_q', ''))
-            ws.cell(row=current_row, column=8, value=result.get('pi_e', ''))
-            ws.cell(row=current_row, column=9, value=result.get('pi_sr', ''))
-            lambda_p_value = result.get('lambda_p', '')
-            ws.cell(row=current_row, column=10, value=str(lambda_p_value))
+            component_type = result.get('component_type', 'capacitor')
+            type_icon = '🔋' if component_type == 'capacitor' else ('⚡' if component_type == 'resistor' else '🔗')
             
-            for col in range(1, 11):
+            col_idx = 1
+            
+            # Component name
+            ws.cell(row=current_row, column=col_idx, value=result.get('name', '-'))
+            col_idx += 1
+            
+            # Type
+            ws.cell(row=current_row, column=col_idx, value=f"{type_icon} {component_type.capitalize()}")
+            col_idx += 1
+            
+            # Style
+            if component_type == 'inductor':
+                ws.cell(row=current_row, column=col_idx, value=result.get('inductor_type', result.get('style', '-')))
+            else:
+                ws.cell(row=current_row, column=col_idx, value=result.get('style', '-'))
+            col_idx += 1
+            
+            # λb
+            ws.cell(row=current_row, column=col_idx, value=result.get('lambda_b', '-'))
+            col_idx += 1
+            
+            # πT
+            ws.cell(row=current_row, column=col_idx, value=result.get('pi_t', '-'))
+            col_idx += 1
+            
+            # πC and πV (capacitor only)
+            if has_capacitors:
+                if component_type == 'capacitor':
+                    ws.cell(row=current_row, column=col_idx, value=result.get('pi_c', '-'))
+                    ws.cell(row=current_row, column=col_idx + 1, value=result.get('pi_v', '-'))
+                else:
+                    ws.cell(row=current_row, column=col_idx, value='-')
+                    ws.cell(row=current_row, column=col_idx + 1, value='-')
+                col_idx += 2
+            
+            # πP and πS (resistor only)
+            if has_resistors:
+                if component_type == 'resistor':
+                    ws.cell(row=current_row, column=col_idx, value=result.get('pi_p', '-'))
+                    ws.cell(row=current_row, column=col_idx + 1, value=result.get('pi_s', '-'))
+                else:
+                    ws.cell(row=current_row, column=col_idx, value='-')
+                    ws.cell(row=current_row, column=col_idx + 1, value='-')
+                col_idx += 2
+            
+            # πQ
+            ws.cell(row=current_row, column=col_idx, value=result.get('pi_q', '-'))
+            col_idx += 1
+            
+            # πE
+            ws.cell(row=current_row, column=col_idx, value=result.get('pi_e', '-'))
+            col_idx += 1
+            
+            # πSR (capacitor only)
+            if has_capacitors:
+                if component_type == 'capacitor':
+                    ws.cell(row=current_row, column=col_idx, value=result.get('pi_sr', '1.0'))
+                else:
+                    ws.cell(row=current_row, column=col_idx, value='-')
+                col_idx += 1
+            
+            # λP
+            lambda_p_value = result.get('lambda_p', '-')
+            ws.cell(row=current_row, column=col_idx, value=str(lambda_p_value))
+            
+            # Apply borders
+            for col in range(1, col_idx + 1):
                 ws.cell(row=current_row, column=col).border = border_thin
                 ws.cell(row=current_row, column=col).alignment = Alignment(vertical='center')
             
             current_row += 1
         
         # Total row
+        total_col_span = len(result_headers) - 1
         ws.cell(row=current_row, column=1, value="TOTAL SYSTEM")
         ws.cell(row=current_row, column=1).font = Font(bold=True)
         ws.cell(row=current_row, column=1).fill = subheader_fill
-        ws.merge_cells(f'A{current_row}:I{current_row}')
+        ws.merge_cells(f'A{current_row}:{get_column_letter(total_col_span)}{current_row}')
         
         total_lambda_value = project_data['results'].get('total_lambda_p', '')
-        ws.cell(row=current_row, column=10, value=str(total_lambda_value))
-        ws.cell(row=current_row, column=10).font = Font(bold=True, size=12)
-        ws.cell(row=current_row, column=10).fill = subheader_fill
+        ws.cell(row=current_row, column=len(result_headers), value=str(total_lambda_value))
+        ws.cell(row=current_row, column=len(result_headers)).font = Font(bold=True, size=12)
+        ws.cell(row=current_row, column=len(result_headers)).fill = subheader_fill
         
-        for col in range(1, 11):
+        for col in range(1, len(result_headers) + 1):
             ws.cell(row=current_row, column=col).border = border_thin
-    
+        
+        current_row += 1
+
     # Auto-size columns
-    for col in range(1, 12):
+    for col in range(1, 15):
         ws.column_dimensions[get_column_letter(col)].width = 15
     ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 25
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 25
     
     return wb
 
 def parse_excel_import(file_stream):
     """Parse single-sheet Excel file and extract project data"""
+    # Helper function to safely get cell value
+    def safe_get_cell(row, col_key, default=''):
+        try:
+            col = col_indices.get(col_key)
+            if col:
+                val = ws.cell(row=row, column=col).value
+                if val is None or str(val).strip() == '-':
+                    return default
+                return str(val).strip()
+            return default
+        except Exception as e:
+            print(f"Error reading cell at row {row}, col {col_key}: {e}")
+            return default
+        
     wb = openpyxl.load_workbook(file_stream)
     ws = wb.active  # Ambil sheet pertama/aktif
     
@@ -1313,28 +1327,41 @@ def parse_excel_import(file_stream):
         
         # Find column indices from headers
         col_indices = {}
-        for col in range(1, 15):  # Check up to column 15
+        for col in range(1, 20):
             header = ws.cell(row=header_row, column=col).value
-            if header:
-                header_str = str(header).lower()
-                if 'component' in header_str and 'name' not in header_str:
-                    col_indices['name'] = col
-                elif 'description' in header_str:
-                    col_indices['description'] = col
-                elif 'manufacturer' in header_str:
-                    col_indices['manufacturer'] = col
-                elif 'part' in header_str:
-                    col_indices['part_number'] = col
-                elif 'style' in header_str:
-                    col_indices['style'] = col
-                elif 'cap' in header_str or 'capacitance' in header_str:
-                    col_indices['capacitance'] = col
-                elif 'stress' in header_str or 'v.stress' in header_str:
-                    col_indices['voltage_stress'] = col
-                elif 'quality' in header_str:
-                    col_indices['quality_level'] = col
-                elif 'series' in header_str or 'resistance' in header_str:
-                    col_indices['series_resistance'] = col
+            if not header:
+                continue
+            
+            header_str = str(header).strip().lower()
+            
+            # Match exact order from export: Component, Type, Description, Manufacturer, Part Number, Style/Type, Cap, V.Stress, Watts, P.Stress, Quality, Series R
+            if col_indices.get('name') is None and 'component' in header_str and 'type' not in header_str:
+                col_indices['name'] = col
+            elif col_indices.get('component_type') is None and header_str == 'type':
+                col_indices['component_type'] = col
+            elif col_indices.get('description') is None and header_str == 'description':
+                col_indices['description'] = col
+            elif col_indices.get('manufacturer') is None and header_str == 'manufacturer':
+                col_indices['manufacturer'] = col
+            elif col_indices.get('part_number') is None and ('part' in header_str or 'number' in header_str):
+                col_indices['part_number'] = col
+            elif col_indices.get('style_or_type') is None and ('style' in header_str or 'type' in header_str) and col > 5:
+                col_indices['style_or_type'] = col
+            elif col_indices.get('capacitance') is None and ('cap' in header_str and 'μf' in header_str):
+                col_indices['capacitance'] = col
+            elif col_indices.get('voltage_stress') is None and 'v.stress' in header_str:
+                col_indices['voltage_stress'] = col
+            elif col_indices.get('watts') is None and header_str == 'watts':
+                col_indices['watts'] = col
+            elif col_indices.get('power_stress') is None and header_str == 'p.stress':
+                col_indices['power_stress'] = col
+            elif col_indices.get('quality_level') is None and header_str == 'quality':
+                col_indices['quality_level'] = col
+            elif col_indices.get('series_resistance') is None and ('series' in header_str and 'r' in header_str):
+                col_indices['series_resistance'] = col
+
+        # Debug: Print found indices
+        print("Found column indices:", col_indices)
         
         # Read component data rows
         data_start = header_row + 1
@@ -1350,36 +1377,96 @@ def parse_excel_import(file_stream):
             if any(keyword in str(name_cell).upper() for keyword in ['CALCULATION', 'RESULT', 'TOTAL']):
                 break
             
+            # Determine component type from Type column or guess from data
+            type_cell = ws.cell(row=row, column=col_indices.get('component_type', 2)).value
+            component_type = 'capacitor'  # default
+
+            if type_cell:
+                type_str = str(type_cell).lower()
+                if 'resistor' in type_str or '⚡' in type_str:
+                    component_type = 'resistor'
+                elif 'inductor' in type_str or '🔗' in type_str:
+                    component_type = 'inductor'
+                elif 'capacitor' in type_str or '🔋' in type_str:
+                    component_type = 'capacitor'
+
+            # If no type cell, try to guess from available data
+            if not type_cell:
+                style_val = ws.cell(row=row, column=col_indices.get('style_or_type', 6)).value
+                if style_val:
+                    style_str = str(style_val).upper()
+                    if any(ind_type in style_str for ind_type in ['FIXED', 'VARIABLE', 'FILM']):
+                        component_type = 'inductor'
+                    elif style_str.startswith('R'):
+                        component_type = 'resistor'
+
             component = {
                 'name': name_cell,
-                'description': ws.cell(row=row, column=col_indices.get('description', 2)).value or '',
-                'manufacturer': ws.cell(row=row, column=col_indices.get('manufacturer', 3)).value or '',
-                'part_number': ws.cell(row=row, column=col_indices.get('part_number', 4)).value or '',
-                'style': ws.cell(row=row, column=col_indices.get('style', 5)).value or '',
+                'component_type': component_type,
+                'description': safe_get_cell(row, 'description', ''),
+                'manufacturer': safe_get_cell(row, 'manufacturer', ''),
+                'part_number': safe_get_cell(row, 'part_number', ''),
                 'temperature': project_data['globalParameters'].get('temperature', 25),
                 'environment': project_data['globalParameters'].get('environment', 'GB')
             }
+
+            # Get style or inductor_type
+            style_or_type_val = ws.cell(row=row, column=col_indices.get('style_or_type', 6)).value
+            if component_type == 'inductor':
+                component['inductor_type'] = str(style_or_type_val).strip() if style_or_type_val and str(style_or_type_val).strip() != '-' else ''
+            else:
+                component['style'] = str(style_or_type_val).strip() if style_or_type_val and str(style_or_type_val).strip() != '-' else ''
+
+            # Validation: Style/inductor_type must not be empty
+            if component_type == 'capacitor' and not component.get('style'):
+                print(f"Warning: Row {row} - Capacitor missing style, skipping")
+                continue
+            elif component_type == 'resistor' and not component.get('style'):
+                print(f"Warning: Row {row} - Resistor missing style, skipping")
+                continue
+            elif component_type == 'inductor' and not component.get('inductor_type'):
+                print(f"Warning: Row {row} - Inductor missing type, skipping")
+                continue
             
-            # Parse numeric values safely
-            try:
-                cap_value = ws.cell(row=row, column=col_indices.get('capacitance', 6)).value
-                component['capacitance'] = float(cap_value) if cap_value else 1.0
-            except:
-                component['capacitance'] = 1.0
-            
-            try:
-                vs_value = ws.cell(row=row, column=col_indices.get('voltage_stress', 7)).value
-                component['voltage_stress'] = float(vs_value) if vs_value else 0.5
-            except:
-                component['voltage_stress'] = 0.5
-            
-            component['quality_level'] = ws.cell(row=row, column=col_indices.get('quality_level', 8)).value or 'M'
-            
-            try:
-                sr_value = ws.cell(row=row, column=col_indices.get('series_resistance', 9)).value
-                component['series_resistance'] = float(sr_value) if sr_value else 1.0
-            except:
-                component['series_resistance'] = 1.0
+            # Parse component-specific parameters
+            if component_type == 'capacitor':
+                try:
+                    cap_value = ws.cell(row=row, column=col_indices.get('capacitance', 7)).value
+                    component['capacitance'] = float(cap_value) if cap_value else 1.0
+                except:
+                    component['capacitance'] = 1.0
+                
+                try:
+                    vs_value = ws.cell(row=row, column=col_indices.get('voltage_stress', 8)).value
+                    component['voltage_stress'] = float(vs_value) if vs_value else 0.5
+                except:
+                    component['voltage_stress'] = 0.5
+                
+                try:
+                    sr_value = ws.cell(row=row, column=col_indices.get('series_resistance', 12)).value
+                    component['series_resistance'] = float(sr_value) if sr_value else 1.0
+                except:
+                    component['series_resistance'] = 1.0
+
+            elif component_type == 'resistor':
+                try:
+                    watts_value = ws.cell(row=row, column=col_indices.get('watts', 9)).value
+                    component['watts'] = float(watts_value) if watts_value else 0.125
+                except:
+                    component['watts'] = 0.125
+                
+                try:
+                    ps_value = ws.cell(row=row, column=col_indices.get('power_stress', 10)).value
+                    component['power_stress'] = float(ps_value) if ps_value else 0.5
+                except:
+                    component['power_stress'] = 0.5
+
+            # Quality level (common for all types)
+            quality_val = ws.cell(row=row, column=col_indices.get('quality_level', 11)).value
+            if component_type == 'inductor':
+                component['quality_level'] = quality_val or 'MIL-SPEC'
+            else:
+                component['quality_level'] = quality_val or 'M'
             
             project_data['components'].append(component)
     

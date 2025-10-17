@@ -129,34 +129,6 @@ def create_tables(cursor):
         created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
     )
     ''')
-    
-    # Enhanced calculations history table (not used for results storage anymore)
-    cursor.execute('''
-    CREATE TABLE calculations_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_name TEXT,
-        component_name TEXT,
-        style TEXT,
-        lambda_b REAL,
-        pi_t REAL,
-        pi_c REAL,
-        pi_v REAL,
-        pi_q REAL,
-        pi_e REAL,
-        pi_sr REAL DEFAULT 1.0,
-        lambda_p REAL,
-        temperature REAL,
-        capacitance REAL,
-        voltage_stress REAL,
-        quality_level TEXT,
-        environment TEXT,
-        series_resistance REAL,
-        description TEXT,
-        manufacturer TEXT,
-        part_number TEXT,
-        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
-    )
-    ''')
 
         # Resistor styles table
     cursor.execute('''
