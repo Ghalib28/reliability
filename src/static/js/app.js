@@ -873,7 +873,7 @@ class EnhancedReliabilityCalculator {
         </div>
         
         <div class="form-group">
-          <label for="series_resistance_${id}">Series Resistance (Ω)</label>
+          <label for="series_resistance_${id}">Circuit Resistance (CR)</label>
           <input type="number" id="series_resistance_${id}" step="0.01" value="1" placeholder="For tantalum capacitors">
           <small>Only applicable to tantalum capacitors</small>
         </div>
@@ -937,14 +937,14 @@ class EnhancedReliabilityCalculator {
         
         <div class="form-group">
           <label for="watts_${id}">Power Dissipation (Watts)</label>
-          <input type="number" id="watts_${id}" step="0.001" value="0.125" required placeholder="Actual power in Watts">
+          <input type="number" id="watts_${id}" step="0.001" value="0.125" required placeholder="Power Dissipation Watts">
           <small>Actual power dissipated by resistor</small>
         </div>
         
         <div class="form-group">
           <label for="power_stress_${id}">Power Stress (S)</label>
           <input type="number" id="power_stress_${id}" step="0.01" min="0" max="1" value="0.5" required placeholder="0.0 to 1.0">
-          <small>Operating power / Rated power</small>
+          <small>Actual Power Dissipation / Rated power</small>
         </div>
         
         <div class="form-group">
