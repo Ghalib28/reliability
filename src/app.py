@@ -286,15 +286,18 @@ def get_db_connection():
 
 def calculate_temperature_factor(temperature, column):
     """Calculate temperature factor using MIL-HDBK-217F equation"""
+    if temperature < -55 or temperature > 150:
+        raise ValueError(f"Temperature {temperature}°C out of range (-55°C to 150°C)")
+    
     if column == 1:
         ea = Config.TEMP_FACTOR_EA_COLUMN1
     else:
         ea = Config.TEMP_FACTOR_EA_COLUMN2
     
-    # Convert Celsius to Kelvin
     temp_kelvin = temperature + 273
+    if temp_kelvin <= 0:
+        raise ValueError(f"Temperature must be above -273°C")
     
-    # π_T = exp(-Ea/k * (1/T - 1/T_ref))
     factor = math.exp(-ea / Config.BOLTZMANN_CONSTANT * 
                      (1/temp_kelvin - 1/Config.REFERENCE_TEMP))
     return round(factor, 6)
@@ -345,8 +348,6 @@ def get_exact_or_calculate_factor(value, data_points, value_column, factor_colum
         return calculate_resistor_power_factor(value)
     elif calculation_type == 'resistor_stress':
         return calculate_resistor_stress_factor(value, column_number)
-    elif calculation_type == 'inductor_temperature':
-        return calculate_inductor_temperature_factor(value)
     else:
         return 1.0
 # Routes
@@ -464,8 +465,8 @@ def get_inductor_styles():
     try:
         conn = get_db_connection()
         styles = conn.execute('''
-            SELECT inductor_type, lambda_b, pi_t_column
-            FROM inductor_styles 
+            SELECT inductor_type, lambda_b
+            FROM inductor_styles
             ORDER BY inductor_type
         ''').fetchall()
         conn.close()
@@ -549,12 +550,18 @@ def calculate_reliability():
 
 def calculate_resistor_temperature_factor(temperature, column):
     """Calculate resistor temperature factor using MIL-HDBK-217F equation"""
+    if temperature < -55 or temperature > 150:
+        raise ValueError(f"Temperature {temperature}°C out of range (-55°C to 150°C)")
+    
     if column == 1:
-        ea = 0.2  # Column 1
+        ea = 0.2
     else:
-        ea = 0.08  # Column 2
+        ea = 0.08
     
     temp_kelvin = temperature + 273
+    if temp_kelvin <= 0:
+        raise ValueError(f"Temperature must be above -273°C")
+    
     factor = math.exp(-ea / Config.BOLTZMANN_CONSTANT * 
                      (1/temp_kelvin - 1/Config.REFERENCE_TEMP))
     return round(factor, 6)
@@ -584,9 +591,17 @@ def calculate_resistor_stress_factor(power_stress, column):
 
 def calculate_inductor_temperature_factor(temperature):
     """Calculate inductor temperature factor using MIL-HDBK-217F equation"""
-    # π_T = exp(-11 / (8.617 x 10^-5) * (1/(T+273) - 1/298))
+    if temperature < -55 or temperature > 190:
+        raise ValueError(f"Temperature {temperature}°C out of range (-55°C to 190°C)")
+    
+    ea = 0.11
     temp_kelvin = temperature + 273
-    factor = math.exp(-11 / (8.617e-5) * (1/temp_kelvin - 1/298))
+    
+    if temp_kelvin <= 0:
+        raise ValueError(f"Temperature must be above -273°C")
+    
+    factor = math.exp(-ea / Config.BOLTZMANN_CONSTANT * 
+                     (1/temp_kelvin - 1/Config.REFERENCE_TEMP))
     return round(factor, 6)
 
 def calculate_inductor_reliability(conn, component):
@@ -614,15 +629,9 @@ def calculate_inductor_reliability(conn, component):
             raise ValueError(f"Inductor type '{inductor_type}' not found")
         
         lambda_b = style_data['lambda_b']
-        
-        # Calculate π_T (Temperature Factor)
-        temp_data = conn.execute('''
-            SELECT temperature, pi_t 
-            FROM inductor_temperature_factors 
-            ORDER BY temperature
-        ''').fetchall()
 
-        pi_t = get_exact_or_calculate_factor(temperature, temp_data, 'temperature', 'pi_t', 'inductor_temperature', None)
+        # Calculate π_T (Temperature Factor)
+        pi_t = calculate_inductor_temperature_factor(temperature)
         
         # Get π_Q (Quality Factor)
         quality_data = conn.execute('''
@@ -656,7 +665,7 @@ def calculate_inductor_reliability(conn, component):
             'pi_t': round(pi_t, 6),
             'pi_q': round(pi_q, 6),
             'pi_e': round(pi_e, 6),
-            'lambda_p': round(lambda_p, 10),
+            'lambda_p': round(lambda_p, 12),
             'parameters': {
                 'description': description,
                 'manufacturer': manufacturer,
@@ -1232,7 +1241,7 @@ def create_excel_export(project_data):
         
         # Total row
         total_col_span = len(result_headers) - 1
-        ws.cell(row=current_row, column=1, value="TOTAL SYSTEM")
+        ws.cell(row=current_row, column=1, value="TOTAL SYSTEM (failures/10⁶ hrs)")
         ws.cell(row=current_row, column=1).font = Font(bold=True)
         ws.cell(row=current_row, column=1).fill = subheader_fill
         ws.merge_cells(f'A{current_row}:{get_column_letter(total_col_span)}{current_row}')

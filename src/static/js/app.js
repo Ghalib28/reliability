@@ -679,7 +679,7 @@ class EnhancedReliabilityCalculator {
     this.environments.forEach((env) => {
       const option = document.createElement("option");
       option.value = env.environment;
-      option.textContent = `${env.environment} (πE: ${env.pi_e})`;
+      option.textContent = `${env.environment}`;
       option.selected = env.environment === this.globalParameters.environment;
       select.appendChild(option);
     });

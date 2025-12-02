@@ -38,7 +38,6 @@ def create_database():
     populate_resistor_environment_factors(cursor)
 
     populate_inductor_styles(cursor)
-    populate_inductor_temperature_factors(cursor)
     populate_inductor_quality_factors(cursor)
     populate_inductor_environment_factors(cursor)
 
@@ -202,17 +201,6 @@ def create_tables(cursor):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         inductor_type TEXT NOT NULL,
         lambda_b REAL NOT NULL,
-        pi_t_column INTEGER DEFAULT 1,
-        created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
-    )
-    ''')
-
-    # Inductor temperature factor table
-    cursor.execute('''
-    CREATE TABLE inductor_temperature_factors (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        temperature INTEGER NOT NULL,
-        pi_t REAL NOT NULL,
         created_at TIMESTAMP DEFAULT (datetime('now', '+7 hours'))
     )
     ''')
@@ -575,44 +563,15 @@ def populate_inductor_styles(cursor):
     """Populate inductor styles from MIL-HDBK-217F data"""
     
     inductor_data = [
-        ('Fixed Inductor or Choke', 0.000030, 1),
-        ('Variable Inductor', 0.000050, 1)
+        ('Fixed Inductor or Choke', 0.000030),
+        ('Variable Inductor', 0.000050)
     ]
     
     cursor.executemany('''
         INSERT INTO inductor_styles 
-        (inductor_type, lambda_b, pi_t_column)
-        VALUES (?, ?, ?)
-    ''', inductor_data)
-
-def populate_inductor_temperature_factors(cursor):
-    """Populate inductor temperature factors"""
-    
-    temp_data = [
-        (20, 0.93),
-        (30, 1.1),
-        (40, 1.2),
-        (50, 1.4),
-        (60, 1.6),
-        (70, 1.8),
-        (80, 1.9),
-        (90, 2.2),
-        (100, 2.4),
-        (110, 2.6),
-        (120, 2.8),
-        (130, 3.1),
-        (140, 3.3),
-        (150, 3.5),
-        (160, 3.8),
-        (170, 4.1),
-        (180, 4.3),
-        (190, 4.6)
-    ]
-    
-    cursor.executemany('''
-        INSERT INTO inductor_temperature_factors (temperature, pi_t)
+        (inductor_type, lambda_b)
         VALUES (?, ?)
-    ''', temp_data)
+    ''', inductor_data)
 
 def populate_inductor_quality_factors(cursor):
     """Populate inductor quality factors"""
