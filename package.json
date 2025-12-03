@@ -14,7 +14,7 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.reliability.lambda-predict",
+    "appId": "ghalibandikazulkhi@gmail.com",
     "productName": "Reliability Lambda Predict",
     "directories": {
       "output": "dist"
@@ -34,6 +34,7 @@
       }
     ],
     "win": {
+      "legalTrademarks": "Copyright © 2025 Ghalib Andhika Zulkhi. All rights reserved.",
       "signAndEditExecutable": false,
       "target": {
         "target": "nsis",
@@ -43,6 +44,16 @@
       },
       "icon": "src/static/assets/icon.ico",
       "requestedExecutionLevel": "asInvoker"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "src/static/assets/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "src/static/assets/icon.png",
+      "category": "Development"
     },
     "nsis": {
       "oneClick": false,
@@ -59,6 +70,7 @@
     "cross-env": "^7.0.3",
     "fs-extra": "^11.0.0"
   },
+  "dependencies": {},
   "author": "Ghalib Andhika Zulkhi",
   "license": "MIT"
 }
