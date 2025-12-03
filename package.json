@@ -4,9 +4,11 @@
   "description": "MIL-HDBK-217F Reliability Prediction Calculator",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "cross-env NODE_ENV=development electron .",
     "dev": "cross-env NODE_ENV=development electron . --dev",
-    "build": "electron-builder",
+    "build": "node build.js",
+    "build:python": "python -m PyInstaller build_app.spec --clean",
+    "build:electron": "electron-builder",
     "dist": "electron-builder --publish=never",
     "pack": "electron-builder --dir",
     "postinstall": "electron-builder install-app-deps"
@@ -27,8 +29,8 @@
     ],
     "extraResources": [
       {
-        "from": "src",
-        "to": "app/src"
+        "from": "resources/flask_app",
+        "to": "flask_app"
       }
     ],
     "win": {
@@ -42,29 +44,21 @@
       "icon": "src/static/assets/icon.ico",
       "requestedExecutionLevel": "asInvoker"
     },
-    "mac": {
-      "target": "dmg",
-      "icon": "src/static/assets/icon.icns",
-      "category": "public.app-category.developer-tools"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "src/static/assets/icon.png",
-      "category": "Development"
-    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerIcon": "src/static/assets/icon.ico",
+      "uninstallerIcon": "src/static/assets/icon.ico"
     }
   },
   "devDependencies": {
     "electron": "^25.0.0",
     "electron-builder": "^24.0.0",
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "fs-extra": "^11.0.0"
   },
-  "dependencies": {},
   "author": "Ghalib Andhika Zulkhi",
   "license": "MIT"
 }

@@ -313,24 +313,16 @@ function createMenu() {
 
 function getPythonCommand() {
   const pythonCommands = ["python", "python3", "py"];
-
   for (const cmd of pythonCommands) {
     try {
       const { execSync } = require("child_process");
-      const result = execSync(`${cmd} --version`, {
-        stdio: "pipe",
-        encoding: "utf8",
-      });
-      console.log(`Found Python: ${cmd} - ${result.trim()}`);
+      execSync(`${cmd} --version`, { stdio: "pipe" });
       return cmd;
     } catch (e) {
-      console.log(`Python command '${cmd}' not found:`, e.message);
       continue;
     }
   }
-  throw new Error(
-    "Python not found. Please install Python 3.8+ and ensure it's in your system PATH."
-  );
+  throw new Error("Python not found");
 }
 
 function getPythonPath() {
@@ -346,55 +338,69 @@ function getPythonPath() {
     return "Python path not found";
   }
 }
-
-function getFlaskAppPath() {
+function getFlaskExecutablePath() {
   if (isDev) {
-    // Development mode
-    return path.join(__dirname, "src", "app.py");
+    // Development: use Python script
+    return {
+      type: "script",
+      path: path.join(__dirname, "src", "app.py"),
+    };
   } else {
-    // Production mode - check multiple locations
-    const possiblePaths = [
-      path.join(process.resourcesPath, "app", "src", "app.py"),
-      path.join(process.resourcesPath, "src", "app.py"),
-      path.join(__dirname, "resources", "src", "app.py"),
-      path.join(__dirname, "src", "app.py"),
-    ];
-
-    for (const appPath of possiblePaths) {
-      if (fs.existsSync(appPath)) {
-        console.log(`Found Flask app at: ${appPath}`);
-        return appPath;
-      }
+    // Production: use bundled executable
+    if (process.platform === "win32") {
+      return {
+        type: "executable",
+        path: path.join(process.resourcesPath, "flask_app", "flask_app.exe"),
+      };
+    } else if (process.platform === "darwin") {
+      return {
+        type: "executable",
+        path: path.join(process.resourcesPath, "flask_app", "flask_app"),
+      };
+    } else {
+      return {
+        type: "executable",
+        path: path.join(process.resourcesPath, "flask_app", "flask_app"),
+      };
     }
-
-    throw new Error(
-      `Flask app.py not found. Checked paths: ${possiblePaths.join(", ")}`
-    );
   }
 }
 
 function startFlaskServer() {
   return new Promise((resolve, reject) => {
     try {
-      const pythonCmd = getPythonCommand();
-      const scriptPath = getFlaskAppPath();
+      const flaskApp = getFlaskExecutablePath();
 
-      console.log(`Starting Flask server with: ${pythonCmd} ${scriptPath}`);
-      console.log(`Working directory: ${path.dirname(scriptPath)}`);
+      console.log(
+        `Starting Flask server: ${flaskApp.type} at ${flaskApp.path}`
+      );
 
-      // Set environment variables for Flask
+      if (!fs.existsSync(flaskApp.path)) {
+        throw new Error(`Flask app not found at: ${flaskApp.path}`);
+      }
+
       const env = {
         ...process.env,
-        PYTHONPATH: path.dirname(scriptPath),
-        FLASK_ENV: isDev ? "development" : "production",
         PYTHONIOENCODING: "utf-8",
+        FLASK_ENV: isDev ? "development" : "production",
       };
 
-      pythonProcess = spawn(pythonCmd, [scriptPath], {
-        cwd: path.dirname(scriptPath),
-        stdio: ["ignore", "pipe", "pipe"],
-        env: env,
-      });
+      if (flaskApp.type === "executable") {
+        // Run bundled executable
+        pythonProcess = spawn(flaskApp.path, [], {
+          cwd: path.dirname(flaskApp.path),
+          stdio: ["ignore", "pipe", "pipe"],
+          env: env,
+        });
+      } else {
+        // Run Python script (development)
+        const pythonCmd = getPythonCommand();
+        pythonProcess = spawn(pythonCmd, [flaskApp.path], {
+          cwd: path.dirname(flaskApp.path),
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...env, PYTHONPATH: path.dirname(flaskApp.path) },
+        });
+      }
 
       let serverStarted = false;
       let startupTimeout;
@@ -408,23 +414,18 @@ function startFlaskServer() {
           !serverStarted
         ) {
           serverStarted = true;
-          if (startupTimeout) {
-            clearTimeout(startupTimeout);
-          }
-          setTimeout(resolve, 2000); // Wait for server to be fully ready
+          if (startupTimeout) clearTimeout(startupTimeout);
+          setTimeout(resolve, 2000);
         }
       });
 
       pythonProcess.stderr.on("data", (data) => {
         const error = data.toString();
         console.error(`Flask stderr: ${error}`);
-
-        // Don't reject on warnings, only on actual errors
         if (
           error.includes("Error") ||
           error.includes("Failed") ||
-          error.includes("ImportError") ||
-          error.includes("ModuleNotFoundError")
+          error.includes("ImportError")
         ) {
           if (!serverStarted && startupTimeout) {
             clearTimeout(startupTimeout);
@@ -435,32 +436,25 @@ function startFlaskServer() {
 
       pythonProcess.on("error", (err) => {
         console.error("Failed to start Flask server:", err);
-        if (startupTimeout) {
-          clearTimeout(startupTimeout);
-        }
+        if (startupTimeout) clearTimeout(startupTimeout);
         reject(err);
       });
 
       pythonProcess.on("close", (code) => {
         console.log(`Flask server exited with code ${code}`);
         if (code !== 0 && code !== null && !serverStarted) {
-          if (startupTimeout) {
-            clearTimeout(startupTimeout);
-          }
+          if (startupTimeout) clearTimeout(startupTimeout);
           reject(new Error(`Flask server exited with code ${code}`));
         }
       });
 
-      // Timeout fallback - give Flask more time to start
       startupTimeout = setTimeout(() => {
         if (!serverStarted && !pythonProcess.killed) {
-          console.log(
-            "Flask server timeout, but process still running - assuming started"
-          );
+          console.log("Flask server timeout - assuming started");
           serverStarted = true;
           resolve();
         }
-      }, 10000); // Increased timeout to 10 seconds
+      }, 10000);
     } catch (error) {
       console.error("Error in startFlaskServer:", error);
       reject(error);

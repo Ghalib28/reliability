@@ -1,5 +1,14 @@
 # Ignore node dependencies
 node_modules/
 
-# Ignore build output
+# Build artifacts
 dist/
+build/
+resources/
+*.spec
+
+# PyInstaller
+*.pyc
+__pycache__/
+*.so
+*.egg-info/
